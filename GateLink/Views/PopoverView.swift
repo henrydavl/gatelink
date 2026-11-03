@@ -21,6 +21,7 @@ struct PopoverView: View {
             footer
         }
         .frame(width: 340)
+        .background(GeometryReader { FitWindowToContent(height: $0.size.height) })
     }
 
     private var header: some View {
@@ -176,6 +177,27 @@ private struct AccountRow: View {
         .disabled(!model.canSwitchAccount)
         .help(model.canSwitchAccount ? "Switch Account" : "Disconnect to switch accounts")
         .accessibilityLabel("Switch Account")
+    }
+}
+
+/// The menu bar window grows with its content but never shrinks, so when the
+/// form hides on connect the content floats in empty space. Resize the window
+/// to the content, keeping its top edge under the menu bar.
+private struct FitWindowToContent: NSViewRepresentable {
+    let height: CGFloat
+
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            guard let window = view.window, height > 0 else { return }
+            var frame = window.frame
+            let target = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: frame.width, height: height)).height
+            guard abs(frame.height - target) > 0.5 else { return }
+            frame.origin.y += frame.height - target
+            frame.size.height = target
+            window.setFrame(frame, display: true)
+        }
     }
 }
 
