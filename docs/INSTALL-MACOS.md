@@ -60,6 +60,13 @@ connected. If the connection drops, GateLink reconnects with a fresh code.
 - **Password**: **Change…** next to Password opens the password window; its
   eye button shows what you typed.
 - **Open at Login**: checkbox at the bottom of the popover.
+- **Updates**: GateLink checks GitHub at launch and every 6 hours. When a
+  newer release exists, **Update to vX.Y.Z** appears next to the version.
+  Click it: GateLink downloads the `.pkg` for your Mac, checks its SHA-256
+  against the release and that it contains GateLink at that version, asks for
+  your administrator password, installs it and reopens. Installing disconnects
+  the VPN. Hover the button for the release notes, right-click it to open them
+  on GitHub, or use … → **Check for Updates**.
 - **Quit** disconnects the VPN. So does a crash or Force Quit: the tunnel
   never outlives the app.
 

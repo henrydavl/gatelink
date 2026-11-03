@@ -132,6 +132,7 @@ struct ConnectionSection: View {
         if case .failed = phase, model.message == nil { return true }
         guard let message = model.message else { return false }
         return !(message.hasPrefix("Added") || message.hasPrefix("Deleted") || message.hasPrefix("Code copied") || message.hasPrefix("Password saved")
-            || message.hasPrefix("GateLink needs") || message.hasPrefix("The tunnel helper was removed"))
+            || message.hasPrefix("GateLink needs") || message.hasPrefix("The tunnel helper was removed")
+            || message.hasSuffix("is up to date.") || message.hasPrefix("Update cancelled"))
     }
 }

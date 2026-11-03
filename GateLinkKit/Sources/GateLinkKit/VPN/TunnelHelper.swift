@@ -61,24 +61,14 @@ public struct TunnelHelper: Sendable {
         guard let installerURL, FileManager.default.fileExists(atPath: installerURL.path) else {
             throw GateLinkError("install-tunnel-helper.sh is missing from the app. Reinstall GateLink.")
         }
-        let command = (["/bin/bash", installerURL.path] + arguments).map(Self.shellQuoted).joined(separator: " ")
-        let script = "do shell script \"\(Self.appleScriptEscaped(command))\" with administrator privileges"
-        let result = try await ProcessRunner.run("/usr/bin/osascript", ["-e", script], timeout: 300)
+        let result = try await ProcessRunner.runAsAdministrator(["/bin/bash", installerURL.path] + arguments)
         guard result.status == 0 else {
-            if result.output.contains("-128") {
+            if result.cancelledPrompt {
                 throw GateLinkError("The administrator prompt was cancelled. GateLink needs the helper once to create the VPN tunnel.")
             }
             let detail = OpenConnectOutput.firstError(in: result.output)
                 ?? result.output.trimmingCharacters(in: .whitespacesAndNewlines)
             throw GateLinkError("Installing the tunnel helper failed: \(detail)")
         }
-    }
-
-    static func shellQuoted(_ value: String) -> String {
-        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
-
-    static func appleScriptEscaped(_ value: String) -> String {
-        value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 }

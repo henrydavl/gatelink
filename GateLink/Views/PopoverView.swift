@@ -63,6 +63,7 @@ struct PopoverView: View {
             Text("v\(model.version)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            UpdateBadge(model: model)
             Spacer()
             Toggle("Open at Login", isOn: Binding(
                 get: { model.openAtLogin },
@@ -131,6 +132,8 @@ private struct AccountRow: View {
 
             Menu {
                 Button("Requirements…") { openWindow(WindowID.requirements) }
+                Button("Check for Updates") { Task { await model.checkForUpdate() } }
+                    .disabled(model.updateStep != nil)
                 Divider()
                 Button("Delete Account…", role: .destructive) { confirmDelete = true }
             } label: {
@@ -173,6 +176,54 @@ private struct AccountRow: View {
         .disabled(!model.canSwitchAccount)
         .help(model.canSwitchAccount ? "Switch Account" : "Disconnect to switch accounts")
         .accessibilityLabel("Switch Account")
+    }
+}
+
+/// Beside the version: a button to install a newer release, then its progress.
+private struct UpdateBadge: View {
+    let model: AppModel
+
+    var body: some View {
+        if let step = model.updateStep {
+            HStack(spacing: 4) {
+                switch step {
+                case .downloading(let fraction):
+                    ProgressView(value: fraction)
+                        .progressViewStyle(.circular)
+                        .controlSize(.mini)
+                    Text("Downloading \(Int(fraction * 100))%")
+                case .verifying:
+                    ProgressView().controlSize(.mini)
+                    Text("Verifying…")
+                case .installing:
+                    ProgressView().controlSize(.mini)
+                    Text("Installing…")
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        } else if let update = model.availableUpdate {
+            Button {
+                Task { await model.installUpdate() }
+            } label: {
+                Label("Update to v\(update.version)", systemImage: "arrow.down.circle.fill")
+            }
+            .buttonStyle(.borderless)
+            .font(.caption)
+            .help(installHelp(update))
+            .contextMenu {
+                Button("Release Notes") { model.openReleaseNotes() }
+            }
+        }
+    }
+
+    private func installHelp(_ update: AppUpdate) -> String {
+        var text = "Download, verify and install GateLink \(update.version), then reopen."
+        if model.session.phase.isConnected || model.session.phase.isBusy {
+            text += " Installing disconnects the VPN."
+        }
+        let notes = update.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        return notes.isEmpty ? text : text + "\n\n" + notes
     }
 }
 

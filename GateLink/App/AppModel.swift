@@ -27,9 +27,18 @@ final class AppModel {
     private(set) var openAtLogin = false
     private(set) var requirements: [Requirement] = []
     private(set) var selectedAccountID: UUID?
+    private(set) var availableUpdate: AppUpdate?
+    private(set) var updateStep: UpdateStep?
+
+    enum UpdateStep: Equatable {
+        case downloading(Double)
+        case verifying
+        case installing
+    }
 
     @ObservationIgnored private let helper: TunnelHelper
     @ObservationIgnored private var relockTicker: Task<Void, Never>?
+    @ObservationIgnored private var updateTicker: Task<Void, Never>?
 
     private static let gatewayKey = "gateway"
     private static let selectedAccountKey = "selectedAccount"
@@ -59,6 +68,7 @@ final class AppModel {
         removeLegacyLaunchAgent()
         refreshOpenAtLogin()
         startRelockTicker()
+        startUpdateTicker()
         Task { await session.stopLeftoverTunnel() }
     }
 
@@ -223,6 +233,65 @@ final class AppModel {
                 throw GateLinkError("No VPN password is saved for \(account.username). Set it and press Connect.")
             }
             return VPNCredentials(username: account.username, password: password, totp: try secret.makeTOTP(for: account))
+        }
+    }
+
+    // MARK: - Update
+
+    private var updater: Updater { Updater(currentVersion: version) }
+
+    /// Checks GitHub now. `quietly` keeps network errors and "up to date" out of the popover.
+    func checkForUpdate(quietly: Bool = false) async {
+        guard updateStep == nil else { return }
+        do {
+            availableUpdate = try await updater.check()
+            if !quietly, availableUpdate == nil { message = "GateLink \(version) is up to date." }
+        } catch {
+            if !quietly { message = error.localizedDescription }
+        }
+    }
+
+    /// Downloads, verifies and installs the update, then relaunches the new app.
+    func installUpdate() async {
+        guard let update = availableUpdate, updateStep == nil else { return }
+        message = nil
+        do {
+            updateStep = .downloading(0)
+            let package = try await updater.download(update) { fraction in
+                Task { @MainActor [weak self] in
+                    if case .downloading = self?.updateStep { self?.updateStep = .downloading(fraction) }
+                }
+            }
+            updateStep = .verifying
+            try await updater.verifyPackage(package, version: update.version)
+
+            // Installer replaces the tunnel helper's engine, so the tunnel must not be using it.
+            if session.phase.isConnected {
+                await session.disconnect()
+            } else if session.phase.isBusy {
+                await session.cancel()
+            }
+            updateStep = .installing
+            try await updater.install(package, version: update.version)
+            try Updater.relaunchAfterExit()
+            NSApp.terminate(nil)
+        } catch {
+            updateStep = nil
+            message = error.localizedDescription
+        }
+    }
+
+    func openReleaseNotes() {
+        guard let url = availableUpdate?.pageURL else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    private func startUpdateTicker() {
+        updateTicker = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.checkForUpdate(quietly: true)
+                try? await Task.sleep(for: .seconds(6 * 60 * 60))
+            }
         }
     }
 

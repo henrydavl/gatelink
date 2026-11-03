@@ -34,6 +34,7 @@ as the app: quitting, a crash or Force Quit takes the tunnel down.
 | `GateLinkKit/` | Swift package with all logic, unit-tested with `swift test` |
 | `GateLinkKit/Sources/GateLinkKit/OTP` | Base32, RFC 6238 TOTP, `otpauth://` parsing, QR reading (Vision) |
 | `GateLinkKit/Sources/GateLinkKit/Vault` | Accounts, Keychain secret store, Touch ID gate with sliding relock |
+| `GateLinkKit/Sources/GateLinkKit/Update` | Release check, checksum-verified `.pkg` download, install and relaunch |
 | `GateLinkKit/Sources/GateLinkKit/VPN` | PTY login, cookie parsing, tunnel controller, helper installer, `VPNSession` state machine |
 | `scripts/gatelink-tunnel` | Root-owned wrapper; the only command sudoers allows |
 | `scripts/install-tunnel-helper.sh` | Installs the wrapper, engine and sudoers rule |

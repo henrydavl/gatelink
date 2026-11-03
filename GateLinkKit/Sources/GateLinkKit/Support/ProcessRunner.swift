@@ -4,6 +4,9 @@ public struct ProcessResult: Sendable {
     public var status: Int32
     /// stdout and stderr, interleaved.
     public var output: String
+
+    /// The user cancelled the macOS administrator prompt (AppleScript error -128).
+    public var cancelledPrompt: Bool { status != 0 && output.contains("-128") }
 }
 
 /// Runs short-lived commands (helper probes, `osascript`) and collects output.
@@ -44,6 +47,27 @@ public enum ProcessRunner {
                 ))
             }
         }
+    }
+
+    /// Runs `command` as root behind the macOS administrator prompt.
+    public static func runAsAdministrator(
+        _ command: [String],
+        prompt: String? = nil,
+        timeout: TimeInterval = 300
+    ) async throws -> ProcessResult {
+        let shell = command.map(shellQuoted).joined(separator: " ")
+        var script = "do shell script \"\(appleScriptEscaped(shell))\""
+        if let prompt { script += " with prompt \"\(appleScriptEscaped(prompt))\"" }
+        script += " with administrator privileges"
+        return try await run("/usr/bin/osascript", ["-e", script], timeout: timeout)
+    }
+
+    static func shellQuoted(_ value: String) -> String {
+        "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    static func appleScriptEscaped(_ value: String) -> String {
+        value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
     }
 }
 
