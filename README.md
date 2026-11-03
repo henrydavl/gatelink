@@ -59,7 +59,6 @@ GATELINK_OPENCONNECT="$PREFIX/sbin/openconnect" GATELINK_EXTRA_PREFIX="$PREFIX" 
   GATELINK_VPNC_SCRIPT="$PREFIX/etc/vpnc/vpnc-script" ./scripts/bundle-openconnect.sh
 
 ./scripts/build-macos-app.sh      # → dist/GateLink.app
-./scripts/build-macos-dmg.sh      # → dist/GateLink.dmg
 ./scripts/build-macos-pkg.sh      # → dist/GateLink.pkg (app + tunnel helper in one install)
 ```
 
@@ -87,6 +86,10 @@ The tests need no network or VPN: the login is exercised against a fake
   host and certificate pin, builds the openconnect command itself from
   root-owned files, and only signals a PID that is its own openconnect.
   The app checks the host and pin too before calling it.
+- **Approved portals**: the wrapper connects only to portals listed in the
+  root-owned `/usr/local/libexec/gatelink/allowed-gateways`. A new portal is
+  added with one administrator prompt on its first Connect, so another program
+  running as you cannot point the root tunnel at its own server.
 - **Logs**: tunnel output goes to `~/Library/Logs/GateLink/tunnel.log` (0600,
   rotated at 512 KB). The session cookie travels on stdin and is never logged.
 

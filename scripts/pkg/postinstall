@@ -14,7 +14,13 @@ if [[ -z "${USER_NAME}" || "${USER_NAME}" == "root" || "${USER_NAME}" == "loginw
     exit 0
 fi
 
-if ! "${APP}/Contents/Resources/install-tunnel-helper.sh" --user "${USER_NAME}"; then
+# Approve the portal the user last connected to, so an update needs no extra prompt.
+# The installer validates it and keeps portals approved earlier.
+args=(--user "${USER_NAME}")
+GATEWAY="$(/usr/bin/sudo -u "${USER_NAME}" /usr/bin/defaults read com.gatelink.app gateway 2>/dev/null || true)"
+[[ "${GATEWAY}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] && args+=(--gateway "${GATEWAY}")
+
+if ! "${APP}/Contents/Resources/install-tunnel-helper.sh" "${args[@]}"; then
     echo "GateLink: tunnel helper install failed; the app retries on first Connect."
 fi
 exit 0

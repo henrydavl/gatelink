@@ -8,14 +8,14 @@
 # so a caller can never inject --script, --csd-wrapper, --config, a pid file,
 # or any other option into the root process.
 #
-# The host is whatever the app form supplied; the wrapper validates it as a
-# DNS name/IP and never accepts options, paths, or a script from the caller.
+# The host must be a DNS name/IP listed in allowed-gateways, which only the
+# installer writes, as root, after an administrator approves the portal. So a
+# program running as the user cannot point the root tunnel at its own server.
 #
 # Callers:
 #   gatelink-tunnel connect --host <host> --fingerprint <pin>
 #       (cookie on stdin; the tunnel stops when stdin closes)
 #   gatelink-tunnel stop
-#   gatelink-tunnel status
 #   gatelink-tunnel version
 #
 set -euo pipefail
@@ -29,6 +29,7 @@ OC="${BASE}/openconnect"
 VPNC_SCRIPT="${BASE}/vpnc-script"
 HIP_SCRIPT="${BASE}/hipreport.sh"
 VERSION_FILE="${BASE}/VERSION"
+ALLOWED="${BASE}/allowed-gateways"
 
 PATH=/usr/bin:/bin:/usr/sbin:/sbin
 export PATH
@@ -53,6 +54,12 @@ valid_host() {
     [[ "${host}" != -* ]] || return 1
     [[ "${host}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || return 1
     return 0
+}
+
+gateway_allowed() {
+    local host
+    host="$(printf '%s' "${1}" | /usr/bin/tr '[:upper:]' '[:lower:]')"
+    [[ -f "${ALLOWED}" ]] && /usr/bin/grep -Fxq -- "${host}" "${ALLOWED}"
 }
 
 valid_fingerprint() {
@@ -112,6 +119,7 @@ cmd_connect() {
     done
 
     valid_host "${host}" || die "invalid gateway host"
+    gateway_allowed "${host}" || die "gateway not approved: ${host} (connect from GateLink to approve it)"
     valid_fingerprint "${fingerprint}" || die "invalid certificate fingerprint"
     [[ -x "${OC}" ]] || die "openconnect missing"
     [[ -x "${VPNC_SCRIPT}" ]] || die "vpnc-script missing"
@@ -200,24 +208,6 @@ cmd_stop() {
     (( found )) || return 0
 }
 
-cmd_status() {
-    require_root
-    local pid p
-
-    if pid="$(read_pid)" && /bin/kill -0 "${pid}" 2>/dev/null && pid_is_tunnel "${pid}"; then
-        printf '%s\n' "${pid}"
-        exit 0
-    fi
-
-    for p in $(find_tunnel_pids); do
-        if pid_is_tunnel "${p}"; then
-            printf '%s\n' "${p}"
-            exit 0
-        fi
-    done
-    exit 1
-}
-
 cmd_version() {
     [[ -f "${VERSION_FILE}" ]] || die "version file missing"
     /bin/cat "${VERSION_FILE}"
@@ -233,17 +223,12 @@ case "${1:-}" in
         [[ $# -eq 0 ]] || die "stop takes no arguments"
         cmd_stop
         ;;
-    status)
-        shift
-        [[ $# -eq 0 ]] || die "status takes no arguments"
-        cmd_status
-        ;;
     version)
         shift
         [[ $# -eq 0 ]] || die "version takes no arguments"
         cmd_version
         ;;
     *)
-        die "usage: gatelink-tunnel connect --host <host> --fingerprint <pin> | stop | status | version"
+        die "usage: gatelink-tunnel connect --host <host> --fingerprint <pin> | stop | version"
         ;;
 esac

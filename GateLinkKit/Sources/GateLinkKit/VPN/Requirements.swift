@@ -48,11 +48,15 @@ public enum Requirements {
         ))
 
         let installed = TunnelHelper.isInstalled
+        let approvedPortals = (try? String(contentsOfFile: TunnelHelper.allowedGatewaysPath, encoding: .utf8))
+            .map { $0.split(whereSeparator: \.isNewline).joined(separator: ", ") }
+            .flatMap { $0.isEmpty ? nil : $0 } ?? "none"
         let authorized = installed ? await TunnelHelper.isAuthorized() : false
         items.append(Requirement(
             name: "Root tunnel helper",
             isMet: authorized,
-            detail: authorized ? "installed (v\(TunnelHelper.expectedVersion))" : installed ? "installed but not authorized" : "not installed",
+            detail: authorized ? "installed (v\(TunnelHelper.expectedVersion)), approved portals: \(approvedPortals)"
+                : installed ? "installed but not authorized" : "not installed",
             fix: authorized ? nil : "Press Connect and approve the administrator prompt, or run scripts/install-tunnel-helper.sh."
         ))
 

@@ -66,10 +66,11 @@ Installer certificate).
 
 ## Upgrading from the .NET app (v0.1.x)
 
-- The Swift app keeps the bundle ID `com.gatelink.app` and the helper version
-  (`4`), so an installed helper keeps working. If the old app never installed
-  the v4 helper (builds before the hardening release), the first Connect
-  installs it and replaces the old NOPASSWD sudoers rule.
+- The Swift app keeps the bundle ID `com.gatelink.app`. It needs tunnel
+  helper v6 (v4 came with the .NET app), so the `.pkg`, or else the first
+  Connect, upgrades the helper and replaces any old NOPASSWD sudoers rule.
+  Bump `HELPER_VERSION` in `scripts/install-tunnel-helper.sh` and
+  `TunnelHelper.expectedVersion` together.
 - The Swift app does not read the old vault (`vault.enc`). Users add their 2FA
   account again and enter the VPN password once.
 - The old Open at Login LaunchAgent is removed on first launch; the setting

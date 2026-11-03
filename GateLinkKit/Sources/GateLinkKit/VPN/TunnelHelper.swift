@@ -3,14 +3,16 @@ import Foundation
 /// Installs and probes the root-owned tunnel helper.
 ///
 /// `scripts/install-tunnel-helper.sh` copies the wrapper, the OpenConnect
-/// engine, `vpnc-script` and `hipreport.sh` to ``directory`` as root:wheel and
-/// writes a sudoers rule that authorizes only the wrapper.
+/// engine, `vpnc-script` and `hipreport.sh` to ``directory`` as root:wheel,
+/// writes the approved portals to ``allowedGatewaysPath`` and a sudoers rule
+/// that authorizes only the wrapper. The wrapper connects only to approved portals.
 public struct TunnelHelper: Sendable {
     public static let directory = "/usr/local/libexec/gatelink"
     public static let helperPath = directory + "/gatelink-tunnel"
     public static let versionPath = directory + "/VERSION"
+    public static let allowedGatewaysPath = directory + "/allowed-gateways"
     public static let sudoersPath = "/etc/sudoers.d/gatelink"
-    public static let expectedVersion = "5"
+    public static let expectedVersion = "6"
 
     /// `install-tunnel-helper.sh` inside the app bundle.
     public var installerURL: URL?
@@ -29,6 +31,12 @@ public struct TunnelHelper: Sendable {
         return version.trimmingCharacters(in: .whitespacesAndNewlines) == expectedVersion
     }
 
+    /// An administrator approved `gateway` for the tunnel.
+    public static func isApproved(_ gateway: String) -> Bool {
+        guard let list = try? String(contentsOfFile: allowedGatewaysPath, encoding: .utf8) else { return false }
+        return list.split(whereSeparator: \.isNewline).contains { $0 == gateway.lowercased() }
+    }
+
     /// Runs the exact command sudoers authorizes. `version` touches nothing,
     /// so this only proves the rule and the helper work.
     public static func isAuthorized() async -> Bool {
@@ -39,18 +47,14 @@ public struct TunnelHelper: Sendable {
             && result.output.trimmingCharacters(in: .whitespacesAndNewlines) == expectedVersion
     }
 
-    /// Installs or repairs the helper when needed. Shows the macOS
-    /// administrator prompt only if the probe fails.
-    public func ensureReady(user: String = NSUserName()) async throws {
-        if Self.isInstalled, await Self.isAuthorized() { return }
-        try await install(user: user)
-        guard Self.isInstalled, await Self.isAuthorized() else {
+    /// Installs or repairs the helper, or approves a new portal, when needed.
+    /// Shows the macOS administrator prompt only then.
+    public func ensureReady(gateway: String, user: String = NSUserName()) async throws {
+        if Self.isInstalled, Self.isApproved(gateway), await Self.isAuthorized() { return }
+        try await runInstaller(arguments: ["--user", user, "--gateway", gateway])
+        guard Self.isInstalled, Self.isApproved(gateway), await Self.isAuthorized() else {
             throw GateLinkError("The tunnel helper was installed but sudo still refuses it. Check /etc/sudoers.d/gatelink.")
         }
-    }
-
-    public func install(user: String = NSUserName()) async throws {
-        try await runInstaller(arguments: ["--user", user])
     }
 
     public func uninstall() async throws {

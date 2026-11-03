@@ -15,8 +15,7 @@ macOS 14 or later.
 Double-click the `.pkg`. It is not notarized, so macOS blocks it the first
 time: open **System Settings → Privacy & Security**, press **Open Anyway**,
 then run the installer. Installer asks for your administrator password once
-and sets up both the app and GateLink's tunnel helper, so Connect works with
-no further prompts.
+and sets up both the app and GateLink's tunnel helper.
 
 GateLink lives in the menu bar (a shield icon); it has no Dock icon.
 
@@ -39,10 +38,12 @@ login password) to save the secret in the Keychain.
    password (or pick it with the Passwords app). It is saved in the Keychain,
    so you do this once.
 2. Press **Connect**.
-3. If the tunnel helper is missing (for example after you removed it from
-   Requirements), Connect asks for an administrator password to reinstall it
-   to `/usr/local/libexec/gatelink`, with a sudoers rule that allows only that
-   helper. The `.pkg` already installed it.
+3. The first Connect to a portal asks for an administrator password once, to
+   approve that portal: the tunnel helper connects only to approved portals.
+   Updates keep the approval. Connect also asks if the helper is missing (for
+   example after you removed it from Requirements) and reinstalls it to
+   `/usr/local/libexec/gatelink`, with a sudoers rule that allows only that
+   helper.
 4. Approve Touch ID. GateLink logs in with your password plus the current code
    and starts the tunnel.
 

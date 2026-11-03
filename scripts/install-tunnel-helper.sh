@@ -11,24 +11,29 @@
 #   /usr/local/libexec/gatelink/*.dylib           (root:wheel 0644)
 #   /usr/local/libexec/gatelink/vpnc-script       (root:wheel 0755)
 #   /usr/local/libexec/gatelink/hipreport.sh      (root:wheel 0755)
+#   /usr/local/libexec/gatelink/allowed-gateways  (root:wheel 0644)
 #   /etc/sudoers.d/gatelink                        (root:wheel 0440)
 #
 # The sudoers rule authorizes exactly one command: the wrapper. The wrapper
 # validates its arguments and builds the openconnect argv itself.
 #
 # USAGE
-#   sudo ./install-tunnel-helper.sh --user "$USER"
+#   sudo ./install-tunnel-helper.sh --user "$USER" --gateway vpn.example.com
 #   sudo ./install-tunnel-helper.sh --uninstall
+#
+# --gateway adds a portal the tunnel may connect to; portals approved earlier
+# are kept.
 #
 set -euo pipefail
 
 HELPER_DIR="/usr/local/libexec/gatelink"
 SUDOERS_FILE="/etc/sudoers.d/gatelink"
-HELPER_VERSION="5"
+HELPER_VERSION="6"
 
 TARGET_USER="${SUDO_USER:-$(stat -f '%Su' /dev/console 2>/dev/null || true)}"
 UNINSTALL=0
 CHECK_ONLY=0
+GATEWAYS=()
 
 die() {
     echo "install-tunnel-helper: $*" >&2
@@ -40,6 +45,7 @@ usage() {
 usage: install-tunnel-helper.sh [--user USER] [--uninstall] [--check]
 
   --user USER       user allowed to run the helper (default: SUDO_USER/console user)
+  --gateway HOST    portal the tunnel may connect to (repeatable; earlier ones are kept)
   --uninstall       remove the helper and its sudoers rule
   --check           print resolved sources and exit without installing
 EOF
@@ -51,6 +57,11 @@ while (( $# )); do
         --user)
             [[ $# -ge 2 ]] || usage
             TARGET_USER="${2}"
+            shift 2
+            ;;
+        --gateway)
+            [[ $# -ge 2 ]] || usage
+            GATEWAYS+=("$(printf '%s' "${2}" | /usr/bin/tr '[:upper:]' '[:lower:]')")
             shift 2
             ;;
         --uninstall)
@@ -81,6 +92,14 @@ fi
 [[ -n "${TARGET_USER}" ]] || die "cannot determine target user; pass --user"
 [[ "${TARGET_USER}" =~ ^[A-Za-z0-9._-]+$ ]] || die "invalid user name: ${TARGET_USER}"
 /usr/bin/id -u "${TARGET_USER}" >/dev/null 2>&1 || die "user does not exist: ${TARGET_USER}"
+
+# Same rule as valid_host in gatelink-tunnel.
+valid_gateway() {
+    [[ -n "${1}" && "${#1}" -le 253 && "${1}" != -* && "${1}" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]]
+}
+for gw in ${GATEWAYS[@]+"${GATEWAYS[@]}"}; do
+    valid_gateway "${gw}" || die "invalid gateway: ${gw}"
+done
 
 # --- locate sources -----------------------------------------------------------
 # Works both from the app bundle (Contents/Resources) and from the repo.
@@ -133,6 +152,7 @@ echo "  openconnect  ${OC_SRC}"
 echo "  vpnc-script  ${VPNC_SRC}"
 echo "  hipreport    ${HIP_SRC}"
 echo "  wrapper      ${WRAPPER}"
+echo "Gateways:    ${GATEWAYS[*]:-<keep approved>}"
 
 if (( CHECK_ONLY )); then
     echo "Check only: not installing."
@@ -140,7 +160,9 @@ if (( CHECK_ONLY )); then
 fi
 
 if [[ "${EUID}" -ne 0 ]]; then
-    exec /usr/bin/sudo "$0" --user "${TARGET_USER}"
+    args=(--user "${TARGET_USER}")
+    for gw in ${GATEWAYS[@]+"${GATEWAYS[@]}"}; do args+=(--gateway "${gw}"); done
+    exec /usr/bin/sudo "$0" "${args[@]}"
 fi
 
 # --- build the rule in a temp file and validate it ----------------------------
@@ -163,7 +185,17 @@ echo "Installing helper files ..."
 /usr/bin/install -m 0755 -o root -g wheel "${OC_SRC}" "${HELPER_DIR}/openconnect"
 /usr/bin/install -m 0755 -o root -g wheel "${VPNC_SRC}" "${HELPER_DIR}/vpnc-script"
 /usr/bin/install -m 0755 -o root -g wheel "${HIP_SRC}" "${HELPER_DIR}/hipreport.sh"
-/bin/rm -f "${HELPER_DIR}/allowed-gateways"
+# Keep portals approved earlier, add the new ones.
+ALLOWED="${HELPER_DIR}/allowed-gateways"
+{
+    if [[ -f "${ALLOWED}" ]]; then
+        while IFS= read -r gw; do valid_gateway "${gw}" && printf '%s\n' "${gw}"; done < "${ALLOWED}"
+    fi
+    for gw in ${GATEWAYS[@]+"${GATEWAYS[@]}"}; do printf '%s\n' "${gw}"; done
+} | /usr/bin/sort -u > "${ALLOWED}.new"
+/usr/sbin/chown root:wheel "${ALLOWED}.new"
+/bin/chmod 0644 "${ALLOWED}.new"
+/bin/mv -f "${ALLOWED}.new" "${ALLOWED}"
 printf '%s\n' "${HELPER_VERSION}" > "${HELPER_DIR}/VERSION"
 /usr/sbin/chown root:wheel "${HELPER_DIR}/VERSION"
 /bin/chmod 0644 "${HELPER_DIR}/VERSION"
@@ -193,4 +225,5 @@ echo "Installing sudoers rule ..."
 echo
 echo "Installed. ${TARGET_USER} may run only:"
 echo "  sudo -n ${HELPER_DIR}/gatelink-tunnel ..."
+echo "Approved gateways: $(/usr/bin/tr '\n' ' ' < "${ALLOWED}")"
 echo "To remove: sudo $0 --uninstall"
