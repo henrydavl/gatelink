@@ -7,13 +7,18 @@ on:
   pull_request:
   workflow_dispatch:   # allow manual runs from the Actions tab
 
+# Actions are pinned to commit hashes: release files reach every Mac through
+# the in-app updater and are installed as root, so a moved tag must not change them.
+permissions:
+  contents: read
+
 jobs:
   # Unit tests for GateLinkKit (OTP, vault, PTY login, session state machine)
   # and a syntax check of the shell scripts that run as root.
   test:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Test GateLinkKit
         run: swift test --package-path GateLinkKit
       - name: Check shell scripts
@@ -39,7 +44,7 @@ jobs:
             arch: x64
             pkg: GateLink-x64.pkg
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       # The SDK sets the look: macOS 26 draws apps built with an older SDK in the old style.
       - name: Use Xcode 26
         run: |
@@ -107,7 +112,7 @@ jobs:
           ./scripts/build-macos-pkg.sh
           mv dist/GateLink.pkg "dist/${{ matrix.pkg }}"
       - name: Upload macOS installer (pkg)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: GateLink-macos-${{ matrix.arch }}-pkg
           path: dist/${{ matrix.pkg }}
@@ -122,11 +127,11 @@ jobs:
       contents: write
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
       - name: Publish Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: |
             artifacts/GateLink-macos-arm64-pkg/GateLink-arm64.pkg
