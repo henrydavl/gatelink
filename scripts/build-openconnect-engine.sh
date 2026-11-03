@@ -28,6 +28,7 @@
 set -euo pipefail
 
 TARGET=14.0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 OPENSSL_VERSION=3.5.9
 OPENCONNECT_VERSION=9.21
 VPNC_COMMIT=ce9e961bd0f6b867e1c7c35f78f6fb973f6ff101
@@ -88,6 +89,9 @@ fetch "https://www.infradead.org/openconnect/download/openconnect-$OPENCONNECT_V
 rm -rf openconnect-src
 mkdir openconnect-src
 tar xzf "openconnect-$OPENCONNECT_VERSION.tar.gz" -C openconnect-src --strip-components=1
+# OpenSSL 3 refuses gateways without secure renegotiation (e.g. vpn.bri.co.id);
+# the patch allows them, as GnuTLS builds do, without --allow-insecure-crypto.
+patch -s -d openconnect-src -p1 < "$SCRIPT_DIR/patches/openconnect-legacy-renegotiation.patch"
 mkdir -p "$BUILD/empty-pkgconfig"
 
 (

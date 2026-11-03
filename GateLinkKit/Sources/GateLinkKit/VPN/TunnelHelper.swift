@@ -10,7 +10,7 @@ public struct TunnelHelper: Sendable {
     public static let helperPath = directory + "/gatelink-tunnel"
     public static let versionPath = directory + "/VERSION"
     public static let sudoersPath = "/etc/sudoers.d/gatelink"
-    public static let expectedVersion = "4"
+    public static let expectedVersion = "5"
 
     /// `install-tunnel-helper.sh` inside the app bundle.
     public var installerURL: URL?

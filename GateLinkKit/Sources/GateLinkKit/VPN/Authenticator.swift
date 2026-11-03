@@ -14,6 +14,10 @@ public protocol VPNAuthenticator: Sendable {
 /// prompt answered with the password immediately followed by the OTP, and
 /// `--usergroup=gateway` forces gateway login (the portal endpoint loops with
 /// HTTP 512).
+///
+/// `--cafile` points at the macOS root bundle: the bundled OpenSSL engine has
+/// no CA store of its own. shortcut: roots trusted only in the Keychain (a
+/// private corporate CA) are not seen; pass a CA file if a gateway needs one.
 public struct OpenConnectAuthenticator: VPNAuthenticator {
     public var executableURL: URL
     public var timeout: TimeInterval
@@ -24,7 +28,10 @@ public struct OpenConnectAuthenticator: VPNAuthenticator {
     }
 
     public func authenticate(gateway: String, username: String, credential: String) async throws -> GPCookie {
-        let arguments = ["--protocol=gp", "--usergroup=gateway", "-u", username, "--authenticate", gateway]
+        let arguments = [
+            "--protocol=gp", "--usergroup=gateway", "--cafile=/etc/ssl/cert.pem",
+            "-u", username, "--authenticate", gateway,
+        ]
         let transcript = try await PTYLogin.run(
             executableURL: executableURL,
             arguments: arguments,
