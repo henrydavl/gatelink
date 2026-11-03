@@ -71,3 +71,85 @@ targets:
           else
             echo "warning: No OpenConnect engine in Engine/openconnect. Run scripts/bundle-openconnect.sh; the app falls back to Homebrew's openconnect."
           fi
+
+  # iOS: the app logs in with libopenconnect and starts GateLinkTunnel, a
+  # Packet Tunnel extension that runs the tunnel. Build the engine first with
+  # scripts/build-openconnect-ios.sh. Needs a paid team: Apple allows
+  # Network Extensions only there. Sideloaded to your own iPhone.
+  GateLinkiOS:
+    type: application
+    configFiles:
+      Debug: GateLinkiOS/Signing.xcconfig
+      Release: GateLinkiOS/Signing.xcconfig
+    platform: iOS
+    deploymentTarget: "18.4"
+    sources:
+      - path: GateLink/App/AppModel.swift
+      - path: GateLink/Shared
+      - path: GateLinkiOS
+        excludes: [Info.plist, "*.entitlements", "*.xcconfig"]
+    dependencies:
+      - package: GateLinkKit
+      - target: GateLinkTunnel
+    info:
+      path: GateLinkiOS/Info.plist
+      properties:
+        CFBundleDisplayName: GateLink
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.utilities
+        NSFaceIDUsageDescription: GateLink uses Face ID before it reads your 2FA secret and VPN password.
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    entitlements:
+      path: GateLinkiOS/GateLinkiOS.entitlements
+      properties:
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        com.apple.security.application-groups: [group.com.example.gatelink]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.gatelink
+        PRODUCT_NAME: GateLink
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_OBJC_BRIDGING_HEADER: GateLinkiOS/Shared/GateLink-Bridging-Header.h
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Engine/ios/include
+        LIBRARY_SEARCH_PATHS: $(SRCROOT)/Engine/ios/lib
+        OTHER_LDFLAGS: [-lopenconnect, -lssl, -lcrypto, -lxml2, -lz, -liconv, -framework, Security]
+
+  GateLinkTunnel:
+    type: app-extension
+    configFiles:
+      Debug: GateLinkiOS/Signing.xcconfig
+      Release: GateLinkiOS/Signing.xcconfig
+    platform: iOS
+    deploymentTarget: "18.4"
+    sources:
+      - path: GateLinkTunnel
+        excludes: [Info.plist, "*.entitlements"]
+      - path: GateLinkiOS/Shared
+    info:
+      path: GateLinkTunnel/Info.plist
+      properties:
+        CFBundleDisplayName: GateLink Tunnel
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.networkextension.packet-tunnel
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PacketTunnelProvider
+    entitlements:
+      path: GateLinkTunnel/GateLinkTunnel.entitlements
+      properties:
+        com.apple.developer.networking.networkextension: [packet-tunnel-provider]
+        com.apple.security.application-groups: [group.com.example.gatelink]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.gatelink.tunnel
+        # NetworkExtension's base class is not concurrency-annotated; Swift 6 mode rejects its overrides.
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        SWIFT_OBJC_BRIDGING_HEADER: GateLinkiOS/Shared/GateLink-Bridging-Header.h
+        HEADER_SEARCH_PATHS: $(SRCROOT)/Engine/ios/include
+        LIBRARY_SEARCH_PATHS: $(SRCROOT)/Engine/ios/lib
+        OTHER_LDFLAGS: [-lopenconnect, -lssl, -lcrypto, -lxml2, -lz, -liconv, -framework, Security]

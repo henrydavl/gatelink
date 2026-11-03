@@ -33,3 +33,6 @@ gatelink-tunnel.log
 
 # Local findings/error logs (may contain usernames/gateways)
 temuan/
+GateLinkiOS/Info.plist
+GateLinkTunnel/Info.plist
+GateLinkiOS/Signing.local.xcconfig
