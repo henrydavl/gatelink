@@ -1,82 +1,35 @@
 # Releasing GateLink
 
-## Signing key
+## Release assets
 
-The .NET builds (v0.1.x) auto-update by verifying a detached RSA-SHA256
-signature over the DMG with a pinned public key. The Swift app (v2) has no
-updater yet, but CI keeps signing releases with the same key so v0.1.x
-installs can update to v2 in place.
-
-The private key was generated into `.secrets/gatelink-release.key` (gitignored).
-**Never commit it.** Store it in a password manager and add its base64 form as a
-GitHub Actions secret named `GATELINK_RELEASE_KEY`:
-
-```bash
-base64 -i .secrets/gatelink-release.key | pbcopy
-```
-
-If the secret is absent, CI still publishes the DMG but **does not sign it**;
-v0.1.x apps then refuse to auto-install it and open the download page instead.
-
-## Architecture-specific assets
-
-macOS releases ship two apps, both requiring macOS 14:
+Each release ships two installers, both requiring macOS 14:
 
 | Asset | Architecture |
 |-------|--------------|
-| `GateLink-arm64.dmg` | Apple Silicon |
-| `GateLink-x64.dmg` | Intel |
-| `GateLink-arm64.pkg` | Apple Silicon installer: app + tunnel helper |
-| `GateLink-x64.pkg` | Intel installer: app + tunnel helper |
+| `GateLink-arm64.pkg` | Apple Silicon: app + tunnel helper |
+| `GateLink-x64.pkg` | Intel: app + tunnel helper |
 
-The `.pkg` is the recommended download for new users: its `postinstall`
-(`scripts/pkg/postinstall`) runs the bundled `install-tunnel-helper.sh` for
-the logged-in user. It is unsigned, so users allow it once under Privacy &
-Security. The auto-updater only uses the DMGs.
+The `.pkg`'s `postinstall` (`scripts/pkg/postinstall`) runs the bundled
+`install-tunnel-helper.sh` for the logged-in user. It is unsigned, so users
+allow it once under Privacy & Security.
 
-`GateLink.dmg` is a byte-identical copy of the arm64 DMG kept so apps released
-before dual-arch support can still auto-update. The v0.1.x updater picks the
-DMG matching its CPU; an Intel app never falls back to the arm64 legacy file.
+Releases no longer ship DMGs, zips or update signatures. The Swift app has no
+updater, and the v0.1.x .NET updater only installed signed DMGs, so v0.1.x
+users upgrade by installing the `.pkg` by hand.
 
 ## Release flow
 
 1. Push a tag `vX.Y.Z` (v2 and later are the Swift app).
-2. CI builds both macOS apps in a matrix:
+2. The `test` job runs `swift test --package-path GateLinkKit`, checks the
+   shell scripts and runs the tunnel wrapper test.
+3. CI builds both macOS apps in a matrix:
    - `macos-15` → arm64
    - `macos-15-intel` → x64
-3. Each job builds the OpenConnect engine from pinned sources with
-   `-mmacosx-version-min=14.0` (see below), bundles it into the `.app`, and
-   builds the app with XcodeGen + `xcodebuild` (`scripts/build-macos-app.sh`),
-   and builds one DMG and one `.pkg`. Before that, the `test` job runs
-   `swift test --package-path GateLinkKit`.
-4. On tags, the `Sign macOS DMG for auto-update` step produces:
-   - `dist/GateLink-arm64.dmg.sig` and `.sha256` (also copied to the legacy
-     `GateLink.dmg.sig` / `.sha256`)
-   - `dist/GateLink-x64.dmg.sig` and `.sha256`
-5. The release job uploads both DMGs, both `.pkg` installers, both signatures, both checksums, the
-   legacy arm64 copy, and the two zips.
-6. A v0.1.x app downloads the DMG for its own CPU, computes SHA-256, verifies
-   the signature with the pinned key, checks the bundle ID and code signature,
-   then swaps the bundle with rollback.
-
-Local signing:
-
-```bash
-./scripts/sign-release.sh dist/GateLink-arm64.dmg .secrets/gatelink-release.key
-./scripts/sign-release.sh dist/GateLink-x64.dmg .secrets/gatelink-release.key
-```
-
-## Key rotation
-
-1. Generate a new RSA-3072 key:
-   ```bash
-   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out new.key
-   openssl rsa -in new.key -pubout
-   ```
-2. Only v0.1.x apps pin the key (`ReleaseSignature.cs` in the .NET history);
-   rotating it means those installs must update manually.
-3. Update the `GATELINK_RELEASE_KEY` secret.
-4. Ship a release signed with the old key first, or require a manual update.
+   Each job builds the OpenConnect engine from pinned sources with
+   `-mmacosx-version-min=14.0` (see below), bundles it into the `.app`, builds
+   the app with XcodeGen + `xcodebuild` (`scripts/build-macos-app.sh`), then
+   the `.pkg` (`scripts/build-macos-pkg.sh`).
+4. The release job publishes both `.pkg` files with generated release notes.
 
 ## macOS runner compatibility and the bundled engine
 
@@ -104,8 +57,8 @@ macOS 12–13 still needs a separate build: lower `LSMinimumSystemVersion`, set
 The current app is **ad-hoc signed**, not Developer ID signed or notarized.
 Gatekeeper rejects it on first launch unless the user explicitly allows it. For
 public distribution, sign with a Developer ID Application certificate and
-notarize with `notarytool`; the update signature is independent of Gatekeeper
-and remains required.
+notarize with `notarytool` (for a `.pkg`, sign it with a Developer ID
+Installer certificate).
 
 
 ## Upgrading from the .NET app (v0.1.x)

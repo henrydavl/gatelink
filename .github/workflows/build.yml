@@ -34,16 +34,10 @@ jobs:
         include:
           - runner: macos-15
             arch: arm64
-            dmg: GateLink-arm64.dmg
             pkg: GateLink-arm64.pkg
-            zip: GateLink-arm64.zip
-            legacy: true      # keep the old single-arch asset for older apps
           - runner: macos-15-intel
             arch: x64
-            dmg: GateLink-x64.dmg
             pkg: GateLink-x64.pkg
-            zip: GateLink-x64.zip
-            legacy: false
     steps:
       - uses: actions/checkout@v4
       - name: Compute version from tag
@@ -98,78 +92,18 @@ jobs:
         run: ./scripts/build-macos-app.sh
         env:
           GATELINK_VERSION: ${{ steps.ver.outputs.version }}
-      - name: Build drag-to-install DMG
-        run: ./scripts/build-macos-dmg.sh
-      - name: Name the architecture-specific DMG
-        run: cp dist/GateLink.dmg "dist/${{ matrix.dmg }}"
       - name: Build installer package (app + tunnel helper)
         run: |
           ./scripts/build-macos-pkg.sh
           mv dist/GateLink.pkg "dist/${{ matrix.pkg }}"
-      - name: Sign macOS DMG for auto-update
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GATELINK_RELEASE_KEY: ${{ secrets.GATELINK_RELEASE_KEY }}
-        run: |
-          if [ -n "${GATELINK_RELEASE_KEY}" ]; then
-            printf '%s' "${GATELINK_RELEASE_KEY}" | base64 -D > "$RUNNER_TEMP/gatelink-release.key"
-            chmod 600 "$RUNNER_TEMP/gatelink-release.key"
-            ./scripts/sign-release.sh "dist/${{ matrix.dmg }}" "$RUNNER_TEMP/gatelink-release.key"
-            if [ "${{ matrix.legacy }}" = "true" ]; then
-              # Older apps look for the single-arch names; the bytes are identical.
-              cp "dist/${{ matrix.dmg }}.sig" dist/GateLink.dmg.sig
-              cp "dist/${{ matrix.dmg }}.sha256" dist/GateLink.dmg.sha256
-            fi
-            rm -f "$RUNNER_TEMP/gatelink-release.key"
-          else
-            echo "::warning::GATELINK_RELEASE_KEY is not set; auto-update will refuse this release."
-          fi
-      - name: Zip the app
-        run: cd dist && zip -r "${{ matrix.zip }}" GateLink.app
-      - name: Upload macOS app (zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: GateLink-macos-${{ matrix.arch }}
-          path: dist/${{ matrix.zip }}
-          if-no-files-found: error
-      - name: Upload macOS installer (dmg)
-        uses: actions/upload-artifact@v4
-        with:
-          name: GateLink-macos-${{ matrix.arch }}-dmg
-          path: dist/${{ matrix.dmg }}
-          if-no-files-found: error
       - name: Upload macOS installer (pkg)
         uses: actions/upload-artifact@v4
         with:
           name: GateLink-macos-${{ matrix.arch }}-pkg
           path: dist/${{ matrix.pkg }}
           if-no-files-found: error
-      - name: Upload legacy macOS DMG (arm64 only)
-        if: matrix.legacy
-        uses: actions/upload-artifact@v4
-        with:
-          name: GateLink-macos-legacy-dmg
-          path: dist/GateLink.dmg
-          if-no-files-found: error
-      - name: Upload macOS signature
-        uses: actions/upload-artifact@v4
-        with:
-          name: GateLink-macos-${{ matrix.arch }}-signature
-          path: |
-            dist/${{ matrix.dmg }}.sig
-            dist/${{ matrix.dmg }}.sha256
-          if-no-files-found: ignore
-      - name: Upload legacy macOS signature (arm64 only)
-        if: matrix.legacy
-        uses: actions/upload-artifact@v4
-        with:
-          name: GateLink-macos-legacy-signature
-          path: |
-            dist/GateLink.dmg.sig
-            dist/GateLink.dmg.sha256
-          if-no-files-found: ignore
 
-  # When a version tag (v*) is pushed, collect both builds into a GitHub Release.
+  # When a version tag (v*) is pushed, publish both installers as a GitHub Release.
   release:
     runs-on: ubuntu-latest
     needs: [ build-macos ]
@@ -185,18 +119,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/GateLink-macos-arm64-dmg/GateLink-arm64.dmg
-            artifacts/GateLink-macos-x64-dmg/GateLink-x64.dmg
-            artifacts/GateLink-macos-legacy-dmg/GateLink.dmg
             artifacts/GateLink-macos-arm64-pkg/GateLink-arm64.pkg
             artifacts/GateLink-macos-x64-pkg/GateLink-x64.pkg
-            artifacts/GateLink-macos-arm64/GateLink-arm64.zip
-            artifacts/GateLink-macos-x64/GateLink-x64.zip
-            artifacts/GateLink-macos-arm64-signature/GateLink-arm64.dmg.sig
-            artifacts/GateLink-macos-arm64-signature/GateLink-arm64.dmg.sha256
-            artifacts/GateLink-macos-x64-signature/GateLink-x64.dmg.sig
-            artifacts/GateLink-macos-x64-signature/GateLink-x64.dmg.sha256
-            artifacts/GateLink-macos-legacy-signature/GateLink.dmg.sig
-            artifacts/GateLink-macos-legacy-signature/GateLink.dmg.sha256
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           generate_release_notes: true

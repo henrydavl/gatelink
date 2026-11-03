@@ -18,10 +18,6 @@ then run the installer. Installer asks for your administrator password once
 and sets up both the app and GateLink's tunnel helper, so Connect works with
 no further prompts.
 
-Prefer drag-to-install? The release also has `GateLink-arm64.dmg` and
-`GateLink-x64.dmg`. With those, the app installs the tunnel helper on the
-first Connect instead (one administrator prompt then).
-
 GateLink lives in the menu bar (a shield icon); it has no Dock icon.
 
 ## 2. Add your 2FA account
@@ -43,10 +39,10 @@ login password) to save the secret in the Keychain.
    password (or pick it with the Passwords app). It is saved in the Keychain,
    so you do this once.
 2. Press **Connect**.
-3. If you installed from the DMG, the first Connect asks for an
-   administrator password to install GateLink's tunnel helper (the `.pkg`
-   already did this). It installs to `/usr/local/libexec/gatelink` and adds a
-   sudoers rule that allows only that helper.
+3. If the tunnel helper is missing (for example after you removed it from
+   Requirements), Connect asks for an administrator password to reinstall it
+   to `/usr/local/libexec/gatelink`, with a sudoers rule that allows only that
+   helper. The `.pkg` already installed it.
 4. Approve Touch ID. GateLink logs in with your password plus the current code
    and starts the tunnel.
 

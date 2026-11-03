@@ -96,9 +96,8 @@ Remove the helper from the Requirements window, or with
 
 The Swift app does not read the old vault. After upgrading, add your 2FA
 account again (QR image or secret key) and enter the VPN password once. The old
-`~/gatelink-auth.log` may contain a session cookie; delete it. See
-[docs/RELEASING.md](docs/RELEASING.md) for how signed releases let v0.1.x
-installs update in place.
+`~/gatelink-auth.log` may contain a session cookie; delete it. v0.1.x does
+not update itself to v2: install the `.pkg` from the release.
 
 ## Troubleshooting
 
