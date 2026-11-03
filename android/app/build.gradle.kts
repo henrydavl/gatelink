@@ -3,6 +3,12 @@ plugins {
   alias(libs.plugins.compose.compiler)
 }
 
+// CI passes the release tag's version (-PgatelinkVersion=2.0.7); 2.0.7 → code 20007.
+val gatelinkVersion = (findProperty("gatelinkVersion") as String?) ?: "2.0.6"
+// Release signing key from CI secrets; without it the release APK is unsigned.
+val keystore = System.getenv("GATELINK_KEYSTORE")
+val keystorePassword = System.getenv("GATELINK_KEYSTORE_PASSWORD")
+
 android {
   namespace = "com.example.gatelink"
   compileSdk = 36
@@ -11,15 +17,28 @@ android {
     // 30: Keystore keys with an auth timeout (setUserAuthenticationParameters).
     minSdk = 30
     targetSdk = 36
-    versionCode = 1
-    versionName = "2.0.6"
+    versionName = gatelinkVersion
+    versionCode = gatelinkVersion.substringBefore("-").split(".").map(String::toInt)
+      .let { (major, minor, patch) -> major * 10000 + minor * 100 + patch }
     // libopenconnect is built for arm64 only (scripts/build-openconnect-android.sh).
     ndk { abiFilters += "arm64-v8a" }
+  }
+
+  signingConfigs {
+    if (keystore != null) {
+      create("release") {
+        storeFile = file(keystore)
+        storePassword = keystorePassword
+        keyAlias = "gatelink"
+        keyPassword = keystorePassword
+      }
+    }
   }
 
   buildTypes {
     release {
       isMinifyEnabled = false
+      signingConfig = signingConfigs.findByName("release")
     }
   }
   compileOptions {

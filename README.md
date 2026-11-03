@@ -108,7 +108,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 The debug APK is signed with Android's debug key, which is fine for your own
-phones; a shared release needs your own signing key.
+phones. Releases attach `GateLink-android.apk`, signed with the GateLink key
+(see [docs/RELEASING.md](docs/RELEASING.md)); a phone with a debug build needs
+one uninstall before it can install a release APK.
 
 ## Security model
 

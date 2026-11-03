@@ -2,20 +2,25 @@
 
 ## Release assets
 
-Each release ships two installers, both requiring macOS 14:
+Each release ships two Mac installers, both requiring macOS 14, and the
+Android app:
 
-| Asset | Architecture |
-|-------|--------------|
+| Asset | For |
+|-------|-----|
 | `GateLink-arm64.pkg` | Apple Silicon: app + tunnel helper |
 | `GateLink-x64.pkg` | Intel: app + tunnel helper |
+| `GateLink-android.apk` | Android 11+ on arm64, signed with the GateLink key |
+
+The iOS app is not released: a Network Extension needs a paid developer team,
+so it is built and installed from Xcode. CI only checks that it compiles.
 
 The `.pkg`'s `postinstall` (`scripts/pkg/postinstall`) runs the bundled
 `install-tunnel-helper.sh` for the logged-in user. It is unsigned, so users
 allow it once under Privacy & Security.
 
-Releases no longer ship DMGs, zips or update signatures. The Swift app has no
-updater, and the v0.1.x .NET updater only installed signed DMGs, so v0.1.x
-users upgrade by installing the `.pkg` by hand.
+Releases no longer ship DMGs, zips or update signatures. The Mac app's updater
+looks only for `GateLink-<arch>.pkg`. The v0.1.x .NET updater only installed
+signed DMGs, so v0.1.x users upgrade by installing the `.pkg` by hand.
 
 ## Release flow
 
@@ -29,7 +34,27 @@ users upgrade by installing the `.pkg` by hand.
    `-mmacosx-version-min=14.0` (see below), bundles it into the `.app`, builds
    the app with XcodeGen + `xcodebuild` (`scripts/build-macos-app.sh`), then
    the `.pkg` (`scripts/build-macos-pkg.sh`).
-4. The release job publishes both `.pkg` files with generated release notes.
+4. `build-ios` compiles the iOS app unsigned. `build-android` builds its engine,
+   runs the unit tests and builds the debug APK; on a tag it builds the release
+   APK with the tag's version (`2.0.7` → `versionCode` 20007).
+5. The release job publishes both `.pkg` files and the APK with generated
+   release notes.
+
+## Android signing key
+
+Every release APK must be signed with the same key, or Android refuses to
+install it over the previous version. The key lives outside the repo in
+`.secrets/gatelink-android.jks` (alias `gatelink`, password in
+`.secrets/gatelink-android.password`; `.secrets/` is gitignored). Back both up:
+losing them means every user uninstalls and adds their account again. CI reads
+them from two repo secrets:
+
+```bash
+base64 -i .secrets/gatelink-android.jks | gh secret set ANDROID_KEYSTORE
+gh secret set ANDROID_KEYSTORE_PASSWORD < .secrets/gatelink-android.password
+```
+
+A tag fails the `build-android` job if `ANDROID_KEYSTORE` is missing.
 
 ## macOS runner compatibility and the bundled engine
 
