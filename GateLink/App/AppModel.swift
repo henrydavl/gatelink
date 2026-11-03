@@ -1,15 +1,18 @@
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import GateLinkKit
 import Observation
-import ServiceManagement
 
-/// App state shared by the menu bar popover and the windows.
+/// App state for the macOS menu bar app and the iOS app. Platform-only parts
+/// live in AppModel+macOS.swift and AppModel+iOS.swift.
 @MainActor
 @Observable
 final class AppModel {
     let vault: Vault
     let session: VPNSession
-    let resources: AppResources
 
     var gateway: String
     /// Typing another account's username switches to that account, so its OTP is used.
@@ -24,11 +27,14 @@ final class AppModel {
     var message: String?
     /// Generator for the visible code; dropped when the vault relocks.
     private(set) var revealed: TOTP?
-    private(set) var openAtLogin = false
-    private(set) var requirements: [Requirement] = []
     private(set) var selectedAccountID: UUID?
-    private(set) var availableUpdate: AppUpdate?
-    private(set) var updateStep: UpdateStep?
+
+    #if os(macOS)
+    let resources: AppResources
+    var openAtLogin = false
+    var requirements: [Requirement] = []
+    var availableUpdate: AppUpdate?
+    var updateStep: UpdateStep?
 
     enum UpdateStep: Equatable {
         case downloading(Double)
@@ -36,22 +42,30 @@ final class AppModel {
         case installing
     }
 
-    @ObservationIgnored private let helper: TunnelHelper
+    @ObservationIgnored let helper: TunnelHelper
+    @ObservationIgnored var updateTicker: Task<Void, Never>?
+    #else
+    @ObservationIgnored let tunnel: PacketTunnelController
+    #endif
     @ObservationIgnored private var relockTicker: Task<Void, Never>?
-    @ObservationIgnored private var updateTicker: Task<Void, Never>?
 
     private static let gatewayKey = "gateway"
     private static let selectedAccountKey = "selectedAccount"
 
     init() {
+        vault = Vault()
+        #if os(macOS)
         resources = AppResources(bundle: .main)
         helper = TunnelHelper(installerURL: resources.installerURL)
-        vault = Vault()
         let engine = resources.openConnectURL ?? URL(fileURLWithPath: "/opt/homebrew/bin/openconnect")
         session = VPNSession(
             authenticator: OpenConnectAuthenticator(executableURL: engine),
             tunnel: HelperTunnelController()
         )
+        #else
+        tunnel = PacketTunnelController()
+        session = VPNSession(authenticator: LibOpenConnectAuthenticator(), tunnel: tunnel)
+        #endif
         gateway = UserDefaults.standard.string(forKey: Self.gatewayKey) ?? ""
         selectedAccountID = UserDefaults.standard.string(forKey: Self.selectedAccountKey).flatMap(UUID.init)
 
@@ -61,15 +75,8 @@ final class AppModel {
             message = error.localizedDescription
         }
         if let account { username = account.username }
-        if resources.openConnectURL == nil {
-            message = "The OpenConnect engine is missing. Open Requirements from the … menu."
-        }
-
-        removeLegacyLaunchAgent()
-        refreshOpenAtLogin()
         startRelockTicker()
-        startUpdateTicker()
-        Task { await session.stopLeftoverTunnel() }
+        startPlatform()
     }
 
     // MARK: - Accounts
@@ -151,8 +158,12 @@ final class AppModel {
         do {
             guard let secret = try await vault.secret(for: account, reason: "Copy the \(account.issuer) code") else { return }
             let code = try secret.makeTOTP(for: account).code()
+            #if os(macOS)
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(code, forType: .string)
+            #else
+            UIPasteboard.general.string = code
+            #endif
             message = "Code copied."
         } catch {
             message = error.localizedDescription
@@ -203,6 +214,7 @@ final class AppModel {
         UserDefaults.standard.set(portal, forKey: Self.gatewayKey)
 
         do {
+            #if os(macOS)
             if !TunnelHelper.isInstalled {
                 message = "GateLink needs a one-time administrator approval to install its tunnel helper."
             } else if !TunnelHelper.isApproved(portal) {
@@ -210,6 +222,7 @@ final class AppModel {
             }
             try await helper.ensureReady(gateway: portal)
             message = nil
+            #endif
 
             if account.username != login {
                 account.username = login
@@ -223,7 +236,7 @@ final class AppModel {
         await session.connect(gateway: portal, credentials: credentials(for: account.id, gateway: portal))
     }
 
-    private func credentials(for id: UUID, gateway: String) -> VPNSession.CredentialProvider {
+    func credentials(for id: UUID, gateway: String) -> VPNSession.CredentialProvider {
         { [weak self] in
             guard let self, let account = vault.accounts.first(where: { $0.id == id }) else {
                 throw GateLinkError("The account was deleted.")
@@ -238,105 +251,6 @@ final class AppModel {
         }
     }
 
-    // MARK: - Update
-
-    private var updater: Updater { Updater(currentVersion: version) }
-
-    /// Checks GitHub now. `quietly` keeps network errors and "up to date" out of the popover.
-    func checkForUpdate(quietly: Bool = false) async {
-        guard updateStep == nil else { return }
-        do {
-            availableUpdate = try await updater.check()
-            if !quietly, availableUpdate == nil { message = "GateLink \(version) is up to date." }
-        } catch {
-            if !quietly { message = error.localizedDescription }
-        }
-    }
-
-    /// Downloads, verifies and installs the update, then relaunches the new app.
-    func installUpdate() async {
-        guard let update = availableUpdate, updateStep == nil else { return }
-        message = nil
-        do {
-            updateStep = .downloading(0)
-            let package = try await updater.download(update) { fraction in
-                Task { @MainActor [weak self] in
-                    if case .downloading = self?.updateStep { self?.updateStep = .downloading(fraction) }
-                }
-            }
-            updateStep = .verifying
-            try await updater.verifyPackage(package, version: update.version)
-
-            // Installer replaces the tunnel helper's engine, so the tunnel must not be using it.
-            if session.phase.isConnected {
-                await session.disconnect()
-            } else if session.phase.isBusy {
-                await session.cancel()
-            }
-            updateStep = .installing
-            try await updater.install(package, version: update.version)
-            try Updater.relaunchAfterExit()
-            NSApp.terminate(nil)
-        } catch {
-            updateStep = nil
-            message = error.localizedDescription
-        }
-    }
-
-    func openReleaseNotes() {
-        guard let url = availableUpdate?.pageURL else { return }
-        NSWorkspace.shared.open(url)
-    }
-
-    private func startUpdateTicker() {
-        updateTicker = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.checkForUpdate(quietly: true)
-                try? await Task.sleep(for: .seconds(6 * 60 * 60))
-            }
-        }
-    }
-
-    // MARK: - System
-
-    func refreshRequirements() async {
-        requirements = await Requirements.check(resources)
-    }
-
-    func uninstallHelper() async {
-        do {
-            try await helper.uninstall()
-            message = "The tunnel helper was removed."
-        } catch {
-            message = error.localizedDescription
-        }
-        await refreshRequirements()
-    }
-
-    func setOpenAtLogin(_ enabled: Bool) {
-        do {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        } catch {
-            message = "Could not change Open at Login: \(error.localizedDescription)"
-        }
-        refreshOpenAtLogin()
-    }
-
-    private func refreshOpenAtLogin() {
-        openAtLogin = SMAppService.mainApp.status == .enabled
-    }
-
-    /// The .NET app used a LaunchAgent; Open at Login now uses SMAppService.
-    private func removeLegacyLaunchAgent() {
-        let agent = FileManager.default.homeDirectoryForCurrentUser
-            .appending(path: "Library/LaunchAgents/com.gatelink.app.plist")
-        try? FileManager.default.removeItem(at: agent)
-    }
-
     private func startRelockTicker() {
         relockTicker = Task { [weak self] in
             while !Task.isCancelled {
@@ -345,11 +259,6 @@ final class AppModel {
                 if revealed != nil, !vault.isUnlocked { revealed = nil }
             }
         }
-    }
-
-    func quit() {
-        // The tunnel helper sees its stdin close and stops the VPN.
-        NSApp.terminate(nil)
     }
 
     var version: String {

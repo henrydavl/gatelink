@@ -22,6 +22,11 @@ public enum VPNPhase: Equatable, Sendable {
         if case .connected = self { return true }
         return false
     }
+
+    public var isFailed: Bool {
+        if case .failed = self { return true }
+        return false
+    }
 }
 
 /// What one login needs. The OTP is generated from `totp` at the last moment.
@@ -118,6 +123,24 @@ public final class VPNSession {
     public func disconnect() async {
         guard phase != .disconnecting, phase != .idle else { return }
         await tearDown(to: .idle)
+    }
+
+    /// Takes over a tunnel that is already up, such as an iOS VPN that kept
+    /// running while the app was closed. A later drop reconnects as usual.
+    public func attach(gateway: String, since: Date, events: AsyncStream<TunnelEvent>, credentials: @escaping CredentialProvider) {
+        guard phase == .idle || phase.isFailed else { return }
+        generation += 1
+        let current = generation
+        cancelTasks()
+        self.gateway = gateway
+        self.credentials = credentials
+        transition(to: .connected(since: since))
+        watcher = Task {
+            for await event in events {
+                guard current == generation else { return }
+                await handle(event, attempt: 0, generation: current)
+            }
+        }
     }
 
     /// The VPN lives only as long as the app. Stops a tunnel that an older
@@ -218,6 +241,13 @@ public final class VPNSession {
             } else {
                 await attemptFailed(establishFailure(code), attempt: attempt, generation: current, stopTunnel: false)
             }
+        case .failed(let reason):
+            failureDetail = reason
+            await handle(.exited(1), attempt: attempt, generation: current)
+        case .stopped:
+            generation += 1
+            cancelTasks()
+            transition(to: .idle)
         }
     }
 

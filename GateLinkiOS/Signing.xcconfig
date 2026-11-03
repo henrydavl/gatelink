@@ -1,0 +1,4 @@
+// Signing for the iOS app and its tunnel extension. Network Extensions need a
+// paid team: put it in Signing.local.xcconfig (gitignored), for example
+//   DEVELOPMENT_TEAM = ABCDE12345
+#include? "Signing.local.xcconfig"

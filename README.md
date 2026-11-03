@@ -7,8 +7,8 @@ in one click. The VPN protocol is handled by the open-source
 [OpenConnect](https://www.infradead.org/openconnect/) engine bundled in the app.
 
 Written in Swift and SwiftUI. Requires macOS 14 Sonoma or later, on Apple
-Silicon or Intel. An Android version with the same screens is sideloaded;
-see [Android](#android).
+Silicon or Intel. iPhone and Android versions with the same screens are
+sideloaded; see [iOS](#ios) and [Android](#android).
 
 ## How a connection works
 
@@ -32,6 +32,9 @@ as the app: quitting, a crash or Force Quit takes the tunnel down.
 | Path | What it is |
 |------|------------|
 | `GateLink/` | The SwiftUI app: menu bar popover, Add Account and Requirements windows |
+| `GateLink/App/AppModel.swift`, `GateLink/Shared` | App state and views shared with the iOS app |
+| `GateLinkiOS/` | The iOS app; `Shared/GLOpenConnect.c` is the C layer over libopenconnect |
+| `GateLinkTunnel/` | The iOS Packet Tunnel extension that runs the tunnel |
 | `android/` | The Android app (Kotlin, Jetpack Compose) and its `VpnService` |
 | `GateLinkKit/` | Swift package with all logic, unit-tested with `swift test` |
 | `GateLinkKit/Sources/GateLinkKit/OTP` | Base32, RFC 6238 TOTP, `otpauth://` parsing, QR reading (Vision) |
@@ -41,8 +44,9 @@ as the app: quitting, a crash or Force Quit takes the tunnel down.
 | `scripts/gatelink-tunnel` | Root-owned wrapper; the only command sudoers allows |
 | `scripts/install-tunnel-helper.sh` | Installs the wrapper, engine and sudoers rule |
 | `scripts/build-openconnect-engine.sh` | Builds OpenConnect + OpenSSL from pinned sources for macOS 14 |
+| `scripts/build-openconnect-ios.sh` | Builds static libopenconnect + OpenSSL for iOS into `Engine/ios` |
 | `scripts/build-openconnect-android.sh` | Builds libopenconnect with its Java bindings for Android (arm64) |
-| `scripts/engine-sources.sh` | The pinned source versions and checksums the macOS and Android engine builds use |
+| `scripts/engine-sources.sh` | The pinned source versions and checksums all engine builds use |
 | `scripts/bundle-openconnect.sh` | Stages the engine and its dylibs in `Engine/openconnect` |
 | `project.yml` | XcodeGen spec for `GateLink.xcodeproj` |
 
@@ -76,6 +80,45 @@ swift test --package-path GateLinkKit
 
 The tests need no network or VPN: the login is exercised against a fake
 `openconnect` script, and the session state machine against fake tunnels.
+
+## iOS
+
+The iPhone app has the popover's screens: the account and code (tap to copy),
+Portal, Username, a password sheet with AutoFill, and Connect. iOS cannot run
+`openconnect` or `sudo`, so the parts are split differently:
+
+```
+Connect
+├─ Face ID unlocks the vault
+├─ the app logs in with libopenconnect: password + OTP → cookie + certificate pin
+│     (the certificate must be trusted by iOS for the portal name you typed)
+└─ startVPNTunnel → GateLinkTunnel (Packet Tunnel extension)
+      libopenconnect opens the SSL tunnel with the cookie, accepting only the pin;
+      iOS applies the gateway's address, split routes and DNS
+```
+
+The VPN keeps running after GateLink closes; reopening it picks the tunnel up.
+A failed tunnel logs in again with a fresh code while the app is open; turning
+the VPN off in Settings does not reconnect. The HIP report the macOS app sends
+(`hipreport.sh`) is not sent on iOS.
+
+Apple allows Network Extensions only for paid developer teams, so a free
+Personal Team cannot sign it. The targets use `com.example.gatelink` IDs. Put
+your team in `GateLinkiOS/Signing.local.xcconfig` (gitignored, so it stays out
+of the repo), sign in to that account in Xcode, then:
+
+```bash
+echo 'DEVELOPMENT_TEAM = ABCDE12345' > GateLinkiOS/Signing.local.xcconfig
+./scripts/build-openconnect-ios.sh   # → Engine/ios (static, iOS 18.4+)
+xcodegen generate
+xcodebuild -project GateLink.xcodeproj -scheme GateLinkiOS -derivedDataPath build/ios \
+  -destination 'id=<iPhone UDID>' -allowProvisioningUpdates build
+xcrun devicectl device install app --device <iPhone UDID> \
+  build/ios/Build/Products/Debug-iphoneos/GateLink.app
+```
+
+Or open `GateLink.xcodeproj` and run the `GateLinkiOS` scheme on the phone.
+Tunnel logs are in Console.app under the subsystem `com.example.gatelink`.
 
 ## Android
 

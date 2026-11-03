@@ -1,3 +1,4 @@
+#if os(macOS) // Process is unavailable on iOS
 import Foundation
 
 public struct ProcessResult: Sendable {
@@ -87,3 +88,4 @@ final class AtomicFlag: @unchecked Sendable {
 
     func set() { lock.withLock { flag = true } }
 }
+#endif
