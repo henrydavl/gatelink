@@ -53,6 +53,8 @@ public struct OTPAuthURI: Sendable, Equatable {
         uri.digits = positiveInt(query["digits"]) ?? 6
         uri.period = positiveInt(query["period"]) ?? 30
         uri.algorithm = OTPAlgorithm(rawValue: (query["algorithm"] ?? "").uppercased()) ?? .sha1
+        // Reject digits or periods the code generator cannot use now, not at connect time.
+        _ = try uri.makeTOTP()
         return uri
     }
 

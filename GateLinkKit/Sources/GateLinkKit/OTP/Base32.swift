@@ -38,22 +38,4 @@ public enum Base32 {
         }
         return output
     }
-
-    public static func encode(_ data: Data) -> String {
-        var result = ""
-        var buffer: UInt32 = 0
-        var bitsLeft = 0
-        for byte in data {
-            buffer = (buffer << 8) | UInt32(byte)
-            bitsLeft += 8
-            while bitsLeft >= 5 {
-                bitsLeft -= 5
-                result.append(alphabet[Int((buffer >> UInt32(bitsLeft)) & 0x1F)])
-            }
-        }
-        if bitsLeft > 0 {
-            result.append(alphabet[Int((buffer << UInt32(5 - bitsLeft)) & 0x1F)])
-        }
-        return result
-    }
 }
