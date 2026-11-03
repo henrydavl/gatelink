@@ -37,11 +37,13 @@ public final class Vault {
     }
 
     /// The account whose VPN username (or OTP label) is `username`, ignoring case.
-    public func account(forUsername username: String) -> Account? {
+    /// Accounts can share a username; then `preferred` wins if it is one of them.
+    public func account(forUsername username: String, preferring preferred: UUID? = nil) -> Account? {
         let typed = username.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !typed.isEmpty else { return nil }
-        return accounts.first { $0.username.caseInsensitiveCompare(typed) == .orderedSame }
-            ?? accounts.first { $0.label.caseInsensitiveCompare(typed) == .orderedSame }
+        let byUsername = accounts.filter { $0.username.caseInsensitiveCompare(typed) == .orderedSame }
+        let matches = byUsername.isEmpty ? accounts.filter { $0.label.caseInsensitiveCompare(typed) == .orderedSame } : byUsername
+        return matches.first { $0.id == preferred } ?? matches.first
     }
 
     /// Prompts only when locked. Returns false if the user cancels.

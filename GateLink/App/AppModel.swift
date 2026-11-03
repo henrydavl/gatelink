@@ -15,7 +15,7 @@ final class AppModel {
     /// Typing another account's username switches to that account, so its OTP is used.
     var username = "" {
         didSet {
-            if let match = vault.account(forUsername: username), match.id != selectedAccountID {
+            if let match = vault.account(forUsername: username, preferring: selectedAccountID), match.id != selectedAccountID {
                 setSelection(match.id)
             }
         }
@@ -205,8 +205,10 @@ final class AppModel {
         do {
             if !TunnelHelper.isInstalled {
                 message = "GateLink needs a one-time administrator approval to install its tunnel helper."
+            } else if !TunnelHelper.isApproved(portal) {
+                message = "GateLink needs an administrator to approve \(portal) once."
             }
-            try await helper.ensureReady()
+            try await helper.ensureReady(gateway: portal)
             message = nil
 
             if account.username != login {
