@@ -2,9 +2,10 @@
 
 ## Signing key
 
-macOS auto-update verifies a detached RSA-SHA256 signature over the DMG before
-mounting it. The public key is pinned in
-`src/GateLink.Core/ReleaseSignature.cs`.
+The .NET builds (v0.1.x) auto-update by verifying a detached RSA-SHA256
+signature over the DMG with a pinned public key. The Swift app (v2) has no
+updater yet, but CI keeps signing releases with the same key so v0.1.x
+installs can update to v2 in place.
 
 The private key was generated into `.secrets/gatelink-release.key` (gitignored).
 **Never commit it.** Store it in a password manager and add its base64 form as a
@@ -15,8 +16,7 @@ base64 -i .secrets/gatelink-release.key | pbcopy
 ```
 
 If the secret is absent, CI still publishes the DMG but **does not sign it**;
-GateLink will refuse to auto-install that release and will open the download
-page instead.
+v0.1.x apps then refuse to auto-install it and open the download page instead.
 
 ## Architecture-specific assets
 
@@ -28,28 +28,28 @@ macOS releases ship two apps, both requiring macOS 14:
 | `GateLink-x64.dmg` | Intel |
 
 `GateLink.dmg` is a byte-identical copy of the arm64 DMG kept so apps released
-before dual-arch support can still auto-update. `UpdateChecker` picks the DMG
-matching `RuntimeInformation.ProcessArchitecture`; an Intel app never falls
-back to the arm64 legacy file, and a missing signature makes the updater open
-the release page instead of installing.
+before dual-arch support can still auto-update. The v0.1.x updater picks the
+DMG matching its CPU; an Intel app never falls back to the arm64 legacy file.
 
 ## Release flow
 
-1. Push a tag `vX.Y.Z`.
+1. Push a tag `vX.Y.Z` (v2 and later are the Swift app).
 2. CI builds both macOS apps in a matrix:
    - `macos-15` → arm64
    - `macos-15-intel` → x64
 3. Each job builds the OpenConnect engine from pinned sources with
    `-mmacosx-version-min=14.0` (see below), bundles it into the `.app`, and
-   builds one DMG.
+   builds the app with XcodeGen + `xcodebuild` (`scripts/build-macos-app.sh`),
+   and builds one DMG. Before that, the `test` job runs
+   `swift test --package-path GateLinkKit`.
 4. On tags, the `Sign macOS DMG for auto-update` step produces:
    - `dist/GateLink-arm64.dmg.sig` and `.sha256` (also copied to the legacy
      `GateLink.dmg.sig` / `.sha256`)
    - `dist/GateLink-x64.dmg.sig` and `.sha256`
 5. The release job uploads both DMGs, both signatures, both checksums, the
    legacy arm64 copy, and the two zips.
-6. The app downloads the DMG for its own CPU, computes SHA-256, verifies the
-   signature with the pinned key, checks the bundle ID and code signature,
+6. A v0.1.x app downloads the DMG for its own CPU, computes SHA-256, verifies
+   the signature with the pinned key, checks the bundle ID and code signature,
    then swaps the bundle with rollback.
 
 Local signing:
@@ -66,7 +66,8 @@ Local signing:
    openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out new.key
    openssl rsa -in new.key -pubout
    ```
-2. Replace `PublicKeyPem` in `ReleaseSignature.cs`.
+2. Only v0.1.x apps pin the key (`ReleaseSignature.cs` in the .NET history);
+   rotating it means those installs must update manually.
 3. Update the `GATELINK_RELEASE_KEY` secret.
 4. Ship a release signed with the old key first, or require a manual update.
 
@@ -89,7 +90,7 @@ newer runners only changes the build toolchain; keep the `MAX=14.0` check.
 
 macOS 12–13 still needs a separate build: lower `LSMinimumSystemVersion`, set
 `TARGET` in `scripts/build-openconnect-engine.sh` (and `-target` in
-`scripts/build-macos-app.sh`), and use an SDK that supports that target.
+`project.yml`), and use an SDK that supports that target.
 
 ## Notarization
 
@@ -99,53 +100,16 @@ public distribution, sign with a Developer ID Application certificate and
 notarize with `notarytool`; the update signature is independent of Gatekeeper
 and remains required.
 
-Windows releases are not Authenticode signed; SmartScreen may warn. The Windows
-update path opens the release page for a manual install.
 
-## Upgrading from a pre-hardening build
+## Upgrading from the .NET app (v0.1.x)
 
-Builds before this change have four unsafe behaviours:
-
-- `/etc/sudoers.d/gatelink` grants NOPASSWD to every openconnect path it can
-  find (including user-writable repo/app bundles) and to `/bin/kill`;
-- the TOTP seed and VPN password live in the login Keychain as generic
-  passwords that any process can read through `/usr/bin/security`;
-- the full `--authenticate` output (including the WebVPN `COOKIE`) is written to
-  `~/gatelink-auth.log`;
-- auto-update downloads and replaces the DMG without verifying a signature.
-
-What happens during an upgrade:
-
-1. **First update is trust-on-first-use.** The old app does not check
-   `GateLink.dmg.sig`; it will install the new DMG if the release is replaced.
-   Prefer a manual install from the signed release and verify the signature
-   with the pinned key before opening the new app.
-2. **Back up the legacy Keychain items first.** On first launch the new app
-   migrates `com.gatelink.vault` to `vault.enc`/`vault.meta.json` and deletes
-   the old items. The old app cannot read the new vault afterwards.
-3. **Approve the v4 helper install once.** On the first Connect the new app
-   runs `install-tunnel-helper.sh`. It overwrites `/etc/sudoers.d/gatelink`
-   with the single wrapper rule, removing the old NOPASSWD openconnect/kill
-   entries and the old marker, and installs root-owned openconnect,
-   `vpnc-script`, `hipreport.sh`, and the wrapper. If the prompt is cancelled,
-   the old dangerous rule remains active.
-4. **Replace `/Applications/GateLink.app`.** Do not run the old app after the
-   upgrade: its `SudoersSetup` can re-add the old NOPASSWD rules and revert the
-   helper. Pre-release helper versions 1–3 are overwritten by v4; the old app
-   may try to revert those too.
-5. **Delete old diagnostic logs.** `~/gatelink-auth.log` may contain a session
-   cookie; the old `~/gatelink-tunnel.log` was world-readable. The new code
-   writes no auth transcript and creates the tunnel log as `0600`.
-6. **Verify the upgrade:**
-   ```bash
-   sudo -n -ll | grep -A6 gatelink
-   sudo -n /usr/local/libexec/gatelink/gatelink-tunnel version   # 4
-   security find-generic-password -s com.gatelink.vault -a __index__ -w  # exit 44
-   ls ~/Library/Application\ Support/GateLink/vault.*             # enc + meta
-   ```
-7. **Windows:** the old build stored credentials only in memory, so there is
-   nothing to migrate. Install the new build and re-enter the account; DPAPI +
-   Windows Hello are now used. The app still requests elevation for the adapter.
-8. **HIP:** the new `hipreport.sh` reports actual FileVault/firewall/Time
-   Machine state instead of a hardcoded compliant profile. A non-compliant
-   machine may now be quarantined by the gateway.
+- The Swift app keeps the bundle ID `com.gatelink.app` and the helper version
+  (`4`), so an installed helper keeps working. If the old app never installed
+  the v4 helper (builds before the hardening release), the first Connect
+  installs it and replaces the old NOPASSWD sudoers rule.
+- The Swift app does not read the old vault (`vault.enc`). Users add their 2FA
+  account again and enter the VPN password once.
+- The old Open at Login LaunchAgent is removed on first launch; the setting
+  now uses `SMAppService`.
+- Delete `~/gatelink-auth.log` from very old builds; it may contain a session
+  cookie.

@@ -3,8 +3,9 @@
 # sign-release.sh — sign a macOS DMG for GateLink auto-update.
 #
 # The private key is NOT in this repository. Generate it once, store it in a
-# password manager / GitHub Actions secret, and keep the public key pinned in
-# src/GateLink.Core/ReleaseSignature.cs.
+# password manager / GitHub Actions secret. Released .NET builds (v0.1.x) pin
+# the public key and verify this signature before auto-updating, so signed
+# releases let them upgrade to the Swift app in place.
 #
 # USAGE
 #   ./scripts/sign-release.sh dist/GateLink.dmg /path/to/gatelink-release.key

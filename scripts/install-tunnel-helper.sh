@@ -87,24 +87,26 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ "${SCRIPT_DIR}" == */Contents/Resources ]]; then
     APP="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-    ASSETS="${APP}/Contents/MacOS/Assets"
+    ENGINE="${APP}/Contents/Helpers/openconnect"
+    VPNC_SRC="${SCRIPT_DIR}/vpnc-script"
     WRAPPER="${SCRIPT_DIR}/gatelink-tunnel"
-    HIP_SRC="${ASSETS}/hipreport.sh"
+    HIP_SRC="${SCRIPT_DIR}/hipreport.sh"
 else
     ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
     WRAPPER="${ROOT}/scripts/gatelink-tunnel"
-    if [[ -d "${ROOT}/dist/GateLink.app" ]]; then
+    HIP_SRC="${ROOT}/scripts/hipreport.sh"
+    if [[ -d "${ROOT}/dist/GateLink.app/Contents/Helpers/openconnect" ]]; then
         APP="${ROOT}/dist/GateLink.app"
-        ASSETS="${APP}/Contents/MacOS/Assets"
+        ENGINE="${APP}/Contents/Helpers/openconnect"
+        VPNC_SRC="${APP}/Contents/Resources/vpnc-script"
     else
         APP=""
-        ASSETS="${ROOT}/src/GateLink.Desktop/Assets"
+        ENGINE="${ROOT}/Engine/openconnect"
+        VPNC_SRC="${ENGINE}/vpnc-script"
     fi
-    HIP_SRC="${ASSETS}/hipreport.sh"
 fi
 
-OC_SRC="${ASSETS}/openconnect/openconnect"
-VPNC_SRC="${ASSETS}/openconnect/vpnc-script"
+OC_SRC="${ENGINE}/openconnect"
 
 # Older/local app bundles may not include vpnc-script. Fall back to the
 # Homebrew/System copy and install a root-owned copy of it.
@@ -166,7 +168,7 @@ printf '%s\n' "${HELPER_VERSION}" > "${HELPER_DIR}/VERSION"
 /usr/sbin/chown root:wheel "${HELPER_DIR}/VERSION"
 /bin/chmod 0644 "${HELPER_DIR}/VERSION"
 
-for dylib in "${ASSETS}"/openconnect/*.dylib; do
+for dylib in "${ENGINE}"/*.dylib; do
     [[ -f "${dylib}" ]] || continue
     /usr/bin/install -m 0644 -o root -g wheel "${dylib}" "${HELPER_DIR}/$(basename "${dylib}")"
 done
@@ -178,7 +180,7 @@ for dylib in "${HELPER_DIR}"/*.dylib; do
     /usr/bin/codesign --force --sign - "${dylib}" >/dev/null 2>&1 || true
 done
 
-# Remove the obsolete marker used by the old NOPASSWD implementation.
+# Remove the obsolete marker used by the old .NET NOPASSWD implementation.
 TARGET_HOME="$(/usr/bin/dscl . -read "/Users/${TARGET_USER}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
 if [[ -n "${TARGET_HOME}" ]]; then
     /bin/rm -f "${TARGET_HOME}/Library/Application Support/GateLink/sudoers-authorized-path.txt"

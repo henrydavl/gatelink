@@ -7,7 +7,7 @@
 # (recursively), and vpnc-script into a staging folder, then rewrites all the
 # Mach-O load paths to be relative (@loader_path), making the set relocatable.
 #
-# Output: src/GateLink.Desktop/Assets/openconnect/  (bundled into the .app later)
+# Output: Engine/openconnect/  (embedded into GateLink.app/Contents/Helpers by Xcode)
 #
 # Inputs:
 #   GATELINK_OPENCONNECT    openconnect binary to bundle (default: PATH/Homebrew)
@@ -21,7 +21,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="$ROOT/src/GateLink.Desktop/Assets/openconnect"
+OUT="$ROOT/Engine/openconnect"
 OC="${GATELINK_OPENCONNECT:-$(command -v openconnect || echo /opt/homebrew/bin/openconnect)}"
 EXTRA_PREFIX="${GATELINK_EXTRA_PREFIX:-}"
 
