@@ -118,6 +118,30 @@ jobs:
           path: dist/${{ matrix.pkg }}
           if-no-files-found: error
 
+  # Compile the iOS app and its tunnel extension so shared code cannot break it
+  # unnoticed. Unsigned: a Network Extension needs the owner's paid team.
+  build-ios:
+    runs-on: macos-15
+    needs: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Use Xcode 26
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app
+          xcodebuild -version
+      - name: Install build tools
+        run: |
+          command -v pkg-config >/dev/null || brew install pkg-config
+          command -v xcodegen >/dev/null || brew install xcodegen
+      - name: Build OpenConnect engine (iOS)
+        run: ./scripts/build-openconnect-ios.sh
+      - name: Build the iOS app
+        run: |
+          xcodegen generate --quiet
+          xcodebuild -quiet -project GateLink.xcodeproj -scheme GateLinkiOS \
+            -destination 'generic/platform=iOS' -derivedDataPath build/ios \
+            CODE_SIGNING_ALLOWED=NO build
+
   # When a version tag (v*) is pushed, publish both installers as a GitHub Release.
   release:
     runs-on: ubuntu-latest

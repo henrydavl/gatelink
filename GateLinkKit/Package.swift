@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "GateLinkKit",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v14), .iOS("18.4")],
     products: [
         .library(name: "GateLinkKit", targets: ["GateLinkKit"]),
     ],

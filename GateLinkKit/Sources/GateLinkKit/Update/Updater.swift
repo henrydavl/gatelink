@@ -1,3 +1,4 @@
+#if os(macOS) // installs a .pkg; iOS updates come from Xcode
 import CryptoKit
 import Foundation
 
@@ -181,3 +182,4 @@ public struct Updater: Sendable {
         try process.run()
     }
 }
+#endif

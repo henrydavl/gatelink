@@ -1,3 +1,4 @@
+#if os(macOS) // the sudo helper is macOS-only
 import Foundation
 
 /// Where the app's bundled tools live.
@@ -71,3 +72,4 @@ public enum Requirements {
         return items
     }
 }
+#endif

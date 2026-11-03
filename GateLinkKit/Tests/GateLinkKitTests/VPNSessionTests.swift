@@ -187,6 +187,38 @@ import Testing
         #expect(await auth.calls.count == 1)
     }
 
+    @Test func adoptsARunningTunnelAndReconnectsAfterADrop() async {
+        let session = makeSession()
+        let (events, feed) = AsyncStream<TunnelEvent>.makeStream()
+        session.attach(gateway: "vpn.example.com", since: clock.now, events: events, credentials: credentials())
+        #expect(session.phase == .connected(since: clock.now))
+        #expect(session.gateway == "vpn.example.com")
+
+        feed.yield(.exited(2))
+        #expect(await drive(clock) { await tunnel.starts.count == 1 })
+        await tunnel.emit(.established)
+        #expect(await eventually { session.phase.isConnected })
+        #expect(await auth.calls.count == 1)
+    }
+
+    @Test func aTunnelStoppedElsewhereDoesNotReconnect() async {
+        let session = makeSession()
+        await connect(session)
+        await tunnel.emit(.stopped)
+        #expect(await eventually { session.phase == .idle })
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(await auth.calls.count == 1)
+    }
+
+    @Test func reportsTheTunnelsFailureReason() async {
+        let session = makeSession()
+        let task = Task { await session.connect(gateway: "vpn.example.com", credentials: credentials()) }
+        await tunnel.waitForStart()
+        await tunnel.emit(.failed("The gateway's certificate changed since login; refusing to connect."))
+        await task.value
+        #expect(session.phase == .failed("The tunnel did not come up: The gateway's certificate changed since login; refusing to connect."))
+    }
+
     @Test func stopsALeftoverTunnelOnlyWhenIdle() async {
         let session = makeSession()
         await session.stopLeftoverTunnel()

@@ -19,7 +19,11 @@ public enum QRCodeReader {
     }
 
     public static func otpAuthURI(in image: CGImage) throws -> OTPAuthURI {
-        let found = try payloads(in: image)
+        try otpAuthURI(inPayloads: payloads(in: image))
+    }
+
+    /// The 2FA setup code among QR payloads, e.g. from a live camera scan.
+    public static func otpAuthURI(inPayloads found: [String]) throws -> OTPAuthURI {
         guard !found.isEmpty else {
             throw GateLinkError("No QR code found in the image.")
         }

@@ -6,6 +6,11 @@ public enum TunnelEvent: Equatable, Sendable {
     case established
     /// The tunnel process ended. Always the last event.
     case exited(Int32)
+    /// The tunnel failed with a readable reason. Always the last event.
+    case failed(String)
+    /// Someone stopped the tunnel outside GateLink, e.g. in iOS Settings.
+    /// Always the last event; no reconnect follows.
+    case stopped
 }
 
 /// Starts and stops the privileged tunnel.
@@ -14,6 +19,7 @@ public protocol TunnelController: Sendable {
     func stop() async
 }
 
+#if os(macOS) // runs the tunnel through sudo; iOS uses a Packet Tunnel
 /// Runs the tunnel through the root-owned `gatelink-tunnel` wrapper via
 /// `sudo -n`. The wrapper builds the openconnect command line itself; the app
 /// only passes a validated host and certificate pin, and the cookie on stdin.
@@ -149,3 +155,4 @@ private final class TunnelOutputReader: @unchecked Sendable {
         }
     }
 }
+#endif

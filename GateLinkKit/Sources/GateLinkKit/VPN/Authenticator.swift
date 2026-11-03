@@ -7,6 +7,7 @@ public protocol VPNAuthenticator: Sendable {
     func authenticate(gateway: String, username: String, credential: String) async throws -> GPCookie
 }
 
+#if os(macOS) // runs openconnect in a PTY; iOS uses libopenconnect
 /// Runs `openconnect --protocol=gp --authenticate` inside a pseudo-terminal.
 ///
 /// openconnect reads the password from a terminal; a plain pipe fails with
@@ -204,3 +205,4 @@ final class PTYSession: @unchecked Sendable {
         process.waitUntilExit()
     }
 }
+#endif
