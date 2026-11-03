@@ -17,7 +17,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIST="$ROOT/dist"
 DERIVED="$ROOT/build/DerivedData"
-VERSION="${GATELINK_VERSION:-2.0.1}"
+VERSION="${GATELINK_VERSION:-2.0.2}"
 IDENTITY="${GATELINK_SIGN_IDENTITY:--}"
 ARCH="${GATELINK_ARCH:-$(uname -m)}"
 
