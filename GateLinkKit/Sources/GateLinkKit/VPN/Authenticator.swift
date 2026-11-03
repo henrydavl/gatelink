@@ -39,7 +39,7 @@ public struct OpenConnectAuthenticator: VPNAuthenticator {
             timeout: timeout
         )
 
-        if let cookie = try? GPCookie.parse(transcript, fallbackHost: gateway) {
+        if let cookie = try? GPCookie.parse(transcript) {
             return cookie
         }
         if OpenConnectOutput.isIncompatibleEngine(transcript) {

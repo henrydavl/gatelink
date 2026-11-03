@@ -164,8 +164,8 @@ public final class VPNSession {
             }
 
             if attempt == 0 { transition(to: .connecting) }
-            // Tunnel to the validated portal name, not cookie.host: HOST is the resolved IP,
-            // which is IPv6 on NAT64 networks, and the root wrapper takes only names and IPv4.
+            // Tunnel to the validated portal name, not openconnect's HOST: that is the resolved
+            // IP, which is IPv6 on NAT64 networks, and the root wrapper takes only names and IPv4.
             // shortcut: assumes the portal name reaches the gateway that issued the cookie;
             // pass RESOLVE through the wrapper if a round-robin gateway rejects it.
             let events = try await tunnel.start(host: gateway, fingerprint: fingerprint, cookie: cookie.cookie)

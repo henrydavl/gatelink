@@ -48,14 +48,6 @@ import Testing
         #expect(await tunnel.starts == [.init(host: "vpn.example.com", fingerprint: "pin-sha256:AbC=", cookie: "authcookie=abc")])
     }
 
-    @Test func tunnelsToThePortalWhenTheGatewayReportsAnIPv6Host() async {
-        let session = makeSession()
-        await auth.setResult(.success(GPCookie(cookie: "c", host: "64:ff9b::673f:60be", fingerprint: "pin-sha256:AbC=")))
-        await connect(session)
-        #expect(session.phase.isConnected)
-        #expect(await tunnel.starts.map(\.host) == ["vpn.example.com"])
-    }
-
     @Test func ignoresASecondConnectWhileTheFirstIsRunning() async {
         let session = makeSession()
         await auth.hold()
@@ -96,7 +88,7 @@ import Testing
         await session.connect(gateway: "-oProxy=x", credentials: credentials())
         #expect(session.phase == .failed("Enter a valid portal: a hostname or IPv4 address."))
 
-        await auth.setResult(.success(GPCookie(cookie: "c", host: "203.0.113.10", fingerprint: "--script=/tmp/x")))
+        await auth.setResult(.success(GPCookie(cookie: "c", fingerprint: "--script=/tmp/x")))
         await session.connect(gateway: "vpn.example.com", credentials: credentials())
         #expect(session.phase == .failed("The gateway did not return a valid certificate fingerprint; refusing to connect."))
         #expect(await tunnel.starts.isEmpty)
@@ -210,7 +202,7 @@ import Testing
         let session = makeSession()
         await auth.setResult(.failure(GateLinkError("Login failed: x")))
         await session.connect(gateway: "vpn.example.com", credentials: credentials())
-        await auth.setResult(.success(GPCookie(cookie: "c", host: "203.0.113.10", fingerprint: "sha256:ab")))
+        await auth.setResult(.success(GPCookie(cookie: "c", fingerprint: "sha256:ab")))
         // The failed login used this step's code; the retry needs the next one.
         clock.advance(by: 30)
         await connect(session)
@@ -221,7 +213,7 @@ import Testing
         let session = makeSession()
         await auth.setResult(.failure(GateLinkError("Login failed: x")))
         await session.connect(gateway: "vpn.example.com", credentials: credentials())
-        await auth.setResult(.success(GPCookie(cookie: "c", host: "203.0.113.10", fingerprint: "sha256:ab")))
+        await auth.setResult(.success(GPCookie(cookie: "c", fingerprint: "sha256:ab")))
 
         let task = Task { await session.connect(gateway: "vpn.example.com", credentials: credentials()) }
         #expect(await eventually { clock.pendingSleeps == 1 })

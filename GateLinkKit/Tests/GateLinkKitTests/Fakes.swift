@@ -92,7 +92,7 @@ actor FakeAuthenticator: VPNAuthenticator {
 
     private(set) var calls: [Call] = []
     var result: Result<GPCookie, GateLinkError> = .success(
-        GPCookie(cookie: "authcookie=abc", host: "203.0.113.10", fingerprint: "pin-sha256:AbC=")
+        GPCookie(cookie: "authcookie=abc", fingerprint: "pin-sha256:AbC=")
     )
     private var gate: CheckedContinuation<Void, Never>?
     private var holdNext = false

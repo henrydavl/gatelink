@@ -10,22 +10,14 @@ import Testing
             + "CONNECT_URL='https://vpn.example.com'\r\n"
             + "FINGERPRINT='pin-sha256:AbC+/12=='\r\n"
             + "RESOLVE='vpn.example.com:203.0.113.10'\r\n"
-        let cookie = try GPCookie.parse(output, fallbackHost: "vpn.example.com")
+        let cookie = try GPCookie.parse(output)
         #expect(cookie.cookie == "authcookie=abc&portal=gw&user=jane")
-        #expect(cookie.host == "203.0.113.10")
-        #expect(cookie.connectURL == "https://vpn.example.com")
         #expect(cookie.fingerprint == "pin-sha256:AbC+/12==")
-        #expect(cookie.resolve == "vpn.example.com:203.0.113.10")
-    }
-
-    @Test func fallsBackToTheGatewayHost() throws {
-        let cookie = try GPCookie.parse("COOKIE=abc\nFINGERPRINT=sha256:ff", fallbackHost: "vpn.example.com")
-        #expect(cookie.host == "vpn.example.com")
     }
 
     @Test func requiresACookie() {
         #expect(throws: GateLinkError.self) {
-            try GPCookie.parse("Login failed.\nHOST=1.2.3.4", fallbackHost: "x")
+            try GPCookie.parse("Login failed.\nHOST=1.2.3.4")
         }
     }
 }

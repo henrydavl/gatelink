@@ -43,7 +43,6 @@ import Testing
             .authenticate(gateway: "vpn.example.com", username: "jane", credential: "hunter2123456")
 
         #expect(cookie.cookie == "authcookie=abc")
-        #expect(cookie.host == "203.0.113.10")
         #expect(cookie.fingerprint == "pin-sha256:AbC+/12==")
         let args = try String(contentsOf: directory.appending(path: "args"), encoding: .utf8)
         #expect(args == "--protocol=gp\n--usergroup=gateway\n--cafile=/etc/ssl/cert.pem\n-u\njane\n--authenticate\nvpn.example.com\n")
