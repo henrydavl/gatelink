@@ -12,7 +12,14 @@ final class AppModel {
     let resources: AppResources
 
     var gateway: String
-    var username = ""
+    /// Typing another account's username switches to that account, so its OTP is used.
+    var username = "" {
+        didSet {
+            if let match = vault.account(forUsername: username), match.id != selectedAccountID {
+                setSelection(match.id)
+            }
+        }
+    }
     /// A newly typed password. Empty means "use the saved one".
     var password = ""
     /// Feedback that is not part of the connection phase.
@@ -63,10 +70,19 @@ final class AppModel {
         vault.accounts.first { $0.id == selectedAccountID } ?? vault.accounts.first
     }
 
+    /// Switching is locked while a connection uses the selected account.
+    var canSwitchAccount: Bool {
+        !session.phase.isBusy && !session.phase.isConnected
+    }
+
     func select(_ account: Account) {
-        selectedAccountID = account.id
-        UserDefaults.standard.set(account.id.uuidString, forKey: Self.selectedAccountKey)
+        setSelection(account.id)
         username = account.username
+    }
+
+    private func setSelection(_ id: UUID) {
+        selectedAccountID = id
+        UserDefaults.standard.set(id.uuidString, forKey: Self.selectedAccountKey)
         revealed = nil
     }
 
@@ -138,7 +154,7 @@ final class AppModel {
 
     private func connect() async {
         message = nil
-        guard var account = matchingAccount() else {
+        guard var account else {
             message = "Add a 2FA account first (+)."
             return
         }
@@ -170,7 +186,6 @@ final class AppModel {
                 account.username = login
                 try vault.update(account)
             }
-            if account.id != selectedAccountID { select(account) }
 
             if !password.isEmpty {
                 guard await vault.unlock(reason: "Connect to \(portal)") else {
@@ -189,16 +204,6 @@ final class AppModel {
         }
 
         await session.connect(gateway: portal, credentials: credentials(for: account.id, gateway: portal))
-    }
-
-    /// Typing another account's username switches to that account, so its
-    /// OTP is used.
-    private func matchingAccount() -> Account? {
-        let typed = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        return vault.accounts.first {
-            $0.username.caseInsensitiveCompare(typed) == .orderedSame
-                || $0.label.caseInsensitiveCompare(typed) == .orderedSame
-        } ?? account
     }
 
     private func credentials(for id: UUID, gateway: String) -> VPNSession.CredentialProvider {

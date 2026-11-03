@@ -73,6 +73,19 @@ import Testing
         #expect(throws: GateLinkError.self) { try vault.setPassword("other", for: draft.account) }
     }
 
+    @Test func findsTheAccountForATypedUsername() async throws {
+        let vault = makeVault()
+        let jane = try draft()
+        let bob = try AccountDraft.fromManualInput("KRUGS4ZANFZSAYJA", issuer: "Corp", username: "90184463")
+        try await vault.add(jane)
+        try await vault.add(bob)
+
+        #expect(vault.account(forUsername: " 90184463 ")?.id == bob.account.id)
+        #expect(vault.account(forUsername: "JANE")?.id == jane.account.id)
+        #expect(vault.account(forUsername: "nobody") == nil)
+        #expect(vault.account(forUsername: "") == nil)
+    }
+
     @Test func deleteRemovesSecretAndMetadata() async throws {
         let vault = makeVault()
         let draft = try draft()

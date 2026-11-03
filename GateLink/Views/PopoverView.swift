@@ -101,6 +101,9 @@ private struct AccountRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+            if model.vault.accounts.count > 1 {
+                accountSwitcher
+            }
             Spacer(minLength: 8)
             CodeView(totp: model.revealed)
             Button {
@@ -114,15 +117,6 @@ private struct AccountRow: View {
 
             Menu {
                 Button("Copy Code") { Task { await model.copyCode() } }
-                if model.vault.accounts.count > 1 {
-                    Menu("Switch Account") {
-                        ForEach(model.vault.accounts) { other in
-                            Button(other.issuer + (other.username.isEmpty ? "" : " (\(other.username))")) {
-                                model.select(other)
-                            }
-                        }
-                    }
-                }
                 Button("Requirements…") { openWindow(WindowID.requirements) }
                 Divider()
                 Button("Delete Account…", role: .destructive) { confirmDelete = true }
@@ -141,6 +135,31 @@ private struct AccountRow: View {
         } message: {
             Text("The 2FA secret and saved password are removed from this Mac.")
         }
+    }
+
+    private var accountSwitcher: some View {
+        Menu {
+            Picker("Account", selection: Binding(
+                get: { account.id },
+                set: { id in
+                    if let picked = model.vault.accounts.first(where: { $0.id == id }) { model.select(picked) }
+                }
+            )) {
+                ForEach(model.vault.accounts) { other in
+                    Text(other.issuer + (other.username.isEmpty ? "" : " (\(other.username))")).tag(other.id)
+                }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            Image(systemName: "chevron.up.chevron.down")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .disabled(!model.canSwitchAccount)
+        .help(model.canSwitchAccount ? "Switch Account" : "Disconnect to switch accounts")
+        .accessibilityLabel("Switch Account")
     }
 }
 
