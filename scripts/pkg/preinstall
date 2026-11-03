@@ -1,0 +1,11 @@
+#!/bin/bash
+#
+# preinstall — runs as root before Installer copies GateLink.app.
+#
+# Installer writes into an existing bundle without deleting files the new
+# version no longer has, so an upgrade from the .NET app (v0.1.x) would keep
+# its DLLs inside the new app. Remove the old bundle first.
+#
+APP="${2%/}/Applications/GateLink.app"
+[[ -n "${2}" && -d "${APP}" ]] && /bin/rm -rf "${APP}"
+exit 0

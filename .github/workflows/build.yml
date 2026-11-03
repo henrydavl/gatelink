@@ -18,7 +18,7 @@ jobs:
         run: swift test --package-path GateLinkKit
       - name: Check shell scripts
         run: |
-          for f in scripts/*.sh scripts/gatelink-tunnel scripts/pkg/postinstall; do bash -n "$f"; done
+          for f in scripts/*.sh scripts/gatelink-tunnel scripts/pkg/*install; do bash -n "$f"; done
 
   # Build the macOS app for both CPU architectures. The bundled OpenConnect
   # engine is compiled from pinned sources with -mmacosx-version-min=14.0, so
