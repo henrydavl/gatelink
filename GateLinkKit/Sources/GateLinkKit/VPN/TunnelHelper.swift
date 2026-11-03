@@ -1,3 +1,4 @@
+#if os(macOS) // the sudo helper is macOS-only
 import Foundation
 
 /// Installs and probes the root-owned tunnel helper.
@@ -76,3 +77,4 @@ public struct TunnelHelper: Sendable {
         }
     }
 }
+#endif

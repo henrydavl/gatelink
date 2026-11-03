@@ -9,6 +9,11 @@ public struct GPCookie: Equatable, Sendable {
     /// Server certificate pin, passed as `--servercert`.
     public var fingerprint: String?
 
+    public init(cookie: String, fingerprint: String?) {
+        self.cookie = cookie
+        self.fingerprint = fingerprint
+    }
+
     /// Parses the `KEY='value'` block.
     public static func parse(_ output: String) throws -> GPCookie {
         var values: [String: String] = [:]
