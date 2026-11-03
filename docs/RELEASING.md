@@ -44,7 +44,10 @@ pinned sources with `-mmacosx-version-min=14.0`, using OpenSSL instead of
 GnuTLS so Homebrew's p11-kit/GnuTLS stack is not linked in. libxml2 comes from
 the SDK. CI verifies every bundled Mach-O has `minos <= 14.0`.
 
-The workflow uses `macos-15` (arm64) and `macos-15-intel` (x64). The runner
+The workflow uses `macos-15` (arm64) and `macos-15-intel` (x64) and selects
+Xcode 26.3 on both. The SDK, not the runner OS, decides the app's look: macOS
+26 draws an app built with the macOS 15 SDK in the old style, so CI fails if
+the app's SDK is below 26. The runner
 version no longer determines the engine's deployment target, so moving to
 newer runners only changes the build toolchain; keep the `MAX=14.0` check.
 
