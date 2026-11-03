@@ -45,7 +45,15 @@ import Testing
 
         #expect(session.phase.isConnected)
         #expect(await auth.calls == [.init(gateway: "vpn.example.com", username: "jane", credential: "hunter2" + expectedOTP)])
-        #expect(await tunnel.starts == [.init(host: "203.0.113.10", fingerprint: "pin-sha256:AbC=", cookie: "authcookie=abc")])
+        #expect(await tunnel.starts == [.init(host: "vpn.example.com", fingerprint: "pin-sha256:AbC=", cookie: "authcookie=abc")])
+    }
+
+    @Test func tunnelsToThePortalWhenTheGatewayReportsAnIPv6Host() async {
+        let session = makeSession()
+        await auth.setResult(.success(GPCookie(cookie: "c", host: "64:ff9b::673f:60be", fingerprint: "pin-sha256:AbC=")))
+        await connect(session)
+        #expect(session.phase.isConnected)
+        #expect(await tunnel.starts.map(\.host) == ["vpn.example.com"])
     }
 
     @Test func ignoresASecondConnectWhileTheFirstIsRunning() async {

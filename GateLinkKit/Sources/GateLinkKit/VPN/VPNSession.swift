@@ -166,15 +166,16 @@ public final class VPNSession {
                 credential: login.password + otp
             )
             try ensureCurrent(current)
-            guard TunnelArgs.isValidHost(cookie.host) else {
-                throw GateLinkError("The gateway returned an invalid tunnel host; refusing to connect.")
-            }
             guard let fingerprint = cookie.fingerprint, TunnelArgs.isValidFingerprint(fingerprint) else {
                 throw GateLinkError("The gateway did not return a valid certificate fingerprint; refusing to connect.")
             }
 
             if attempt == 0 { transition(to: .connecting) }
-            let events = try await tunnel.start(host: cookie.host, fingerprint: fingerprint, cookie: cookie.cookie)
+            // Tunnel to the validated portal name, not cookie.host: HOST is the resolved IP,
+            // which is IPv6 on NAT64 networks, and the root wrapper takes only names and IPv4.
+            // shortcut: assumes the portal name reaches the gateway that issued the cookie;
+            // pass RESOLVE through the wrapper if a round-robin gateway rejects it.
+            let events = try await tunnel.start(host: gateway, fingerprint: fingerprint, cookie: cookie.cookie)
             guard current == generation else {
                 await tunnel.stop()
                 return
