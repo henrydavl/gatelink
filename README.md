@@ -59,6 +59,7 @@ GATELINK_OPENCONNECT="$PREFIX/sbin/openconnect" GATELINK_EXTRA_PREFIX="$PREFIX" 
 
 ./scripts/build-macos-app.sh      # → dist/GateLink.app
 ./scripts/build-macos-dmg.sh      # → dist/GateLink.dmg
+./scripts/build-macos-pkg.sh      # → dist/GateLink.pkg (app + tunnel helper in one install)
 ```
 
 To work in Xcode, run `xcodegen generate` and open `GateLink.xcodeproj`.

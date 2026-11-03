@@ -2,18 +2,25 @@
 
 ## 1. Install
 
-Download the DMG for your Mac from the latest release:
+Download the installer for your Mac from the latest release:
 
 | Mac | File |
 |-----|------|
-| Apple Silicon (M1 and later) | `GateLink-arm64.dmg` |
-| Intel | `GateLink-x64.dmg` |
+| Apple Silicon (M1 and later) | `GateLink-arm64.pkg` |
+| Intel | `GateLink-x64.pkg` |
 
 Check with `uname -m`: `arm64` is Apple Silicon, `x86_64` is Intel. Both need
 macOS 14 or later.
 
-Open the DMG and drag GateLink to Applications. The app is not notarized, so
-the first launch needs **System Settings → Privacy & Security → Open Anyway**.
+Double-click the `.pkg`. It is not notarized, so macOS blocks it the first
+time: open **System Settings → Privacy & Security**, press **Open Anyway**,
+then run the installer. Installer asks for your administrator password once
+and sets up both the app and GateLink's tunnel helper, so Connect works with
+no further prompts.
+
+Prefer drag-to-install? The release also has `GateLink-arm64.dmg` and
+`GateLink-x64.dmg`. With those, the app installs the tunnel helper on the
+first Connect instead (one administrator prompt then).
 
 GateLink lives in the menu bar (a shield icon); it has no Dock icon.
 
@@ -35,9 +42,10 @@ login password) to save the secret in the Keychain.
    **Password**. The password is saved in the Keychain after the first
    connect; afterwards leave the field empty.
 2. Press **Connect**.
-3. The first time only, macOS asks for an administrator password to install
-   GateLink's tunnel helper. It installs to `/usr/local/libexec/gatelink` and
-   adds a sudoers rule that allows only that helper.
+3. If you installed from the DMG, the first Connect asks for an
+   administrator password to install GateLink's tunnel helper (the `.pkg`
+   already did this). It installs to `/usr/local/libexec/gatelink` and adds a
+   sudoers rule that allows only that helper.
 4. Approve Touch ID. GateLink logs in with your password plus the current code
    and starts the tunnel.
 

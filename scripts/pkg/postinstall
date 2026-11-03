@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# postinstall — runs as root after Installer copies GateLink.app.
+#
+# Installs the root tunnel helper for the logged-in user, so the first Connect
+# needs no extra administrator prompt. A failure here does not fail the
+# install: the app offers to install the helper on the first Connect.
+#
+APP="${2%/}/Applications/GateLink.app"
+USER_NAME="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null)"
+
+if [[ -z "${USER_NAME}" || "${USER_NAME}" == "root" || "${USER_NAME}" == "loginwindow" ]]; then
+    echo "GateLink: no logged-in user; the app installs the tunnel helper on first Connect."
+    exit 0
+fi
+
+if ! "${APP}/Contents/Resources/install-tunnel-helper.sh" --user "${USER_NAME}"; then
+    echo "GateLink: tunnel helper install failed; the app retries on first Connect."
+fi
+exit 0

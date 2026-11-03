@@ -26,6 +26,13 @@ macOS releases ship two apps, both requiring macOS 14:
 |-------|--------------|
 | `GateLink-arm64.dmg` | Apple Silicon |
 | `GateLink-x64.dmg` | Intel |
+| `GateLink-arm64.pkg` | Apple Silicon installer: app + tunnel helper |
+| `GateLink-x64.pkg` | Intel installer: app + tunnel helper |
+
+The `.pkg` is the recommended download for new users: its `postinstall`
+(`scripts/pkg/postinstall`) runs the bundled `install-tunnel-helper.sh` for
+the logged-in user. It is unsigned, so users allow it once under Privacy &
+Security. The auto-updater only uses the DMGs.
 
 `GateLink.dmg` is a byte-identical copy of the arm64 DMG kept so apps released
 before dual-arch support can still auto-update. The v0.1.x updater picks the
@@ -40,13 +47,13 @@ DMG matching its CPU; an Intel app never falls back to the arm64 legacy file.
 3. Each job builds the OpenConnect engine from pinned sources with
    `-mmacosx-version-min=14.0` (see below), bundles it into the `.app`, and
    builds the app with XcodeGen + `xcodebuild` (`scripts/build-macos-app.sh`),
-   and builds one DMG. Before that, the `test` job runs
+   and builds one DMG and one `.pkg`. Before that, the `test` job runs
    `swift test --package-path GateLinkKit`.
 4. On tags, the `Sign macOS DMG for auto-update` step produces:
    - `dist/GateLink-arm64.dmg.sig` and `.sha256` (also copied to the legacy
      `GateLink.dmg.sig` / `.sha256`)
    - `dist/GateLink-x64.dmg.sig` and `.sha256`
-5. The release job uploads both DMGs, both signatures, both checksums, the
+5. The release job uploads both DMGs, both `.pkg` installers, both signatures, both checksums, the
    legacy arm64 copy, and the two zips.
 6. A v0.1.x app downloads the DMG for its own CPU, computes SHA-256, verifies
    the signature with the pinned key, checks the bundle ID and code signature,

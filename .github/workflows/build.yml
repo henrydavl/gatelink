@@ -18,7 +18,7 @@ jobs:
         run: swift test --package-path GateLinkKit
       - name: Check shell scripts
         run: |
-          for f in scripts/*.sh scripts/gatelink-tunnel; do bash -n "$f"; done
+          for f in scripts/*.sh scripts/gatelink-tunnel scripts/pkg/postinstall; do bash -n "$f"; done
 
   # Build the macOS app for both CPU architectures. The bundled OpenConnect
   # engine is compiled from pinned sources with -mmacosx-version-min=14.0, so
@@ -33,11 +33,13 @@ jobs:
           - runner: macos-15
             arch: arm64
             dmg: GateLink-arm64.dmg
+            pkg: GateLink-arm64.pkg
             zip: GateLink-arm64.zip
             legacy: true      # keep the old single-arch asset for older apps
           - runner: macos-15-intel
             arch: x64
             dmg: GateLink-x64.dmg
+            pkg: GateLink-x64.pkg
             zip: GateLink-x64.zip
             legacy: false
     steps:
@@ -98,6 +100,10 @@ jobs:
         run: ./scripts/build-macos-dmg.sh
       - name: Name the architecture-specific DMG
         run: cp dist/GateLink.dmg "dist/${{ matrix.dmg }}"
+      - name: Build installer package (app + tunnel helper)
+        run: |
+          ./scripts/build-macos-pkg.sh
+          mv dist/GateLink.pkg "dist/${{ matrix.pkg }}"
       - name: Sign macOS DMG for auto-update
         if: startsWith(github.ref, 'refs/tags/v')
         env:
@@ -129,6 +135,12 @@ jobs:
         with:
           name: GateLink-macos-${{ matrix.arch }}-dmg
           path: dist/${{ matrix.dmg }}
+          if-no-files-found: error
+      - name: Upload macOS installer (pkg)
+        uses: actions/upload-artifact@v4
+        with:
+          name: GateLink-macos-${{ matrix.arch }}-pkg
+          path: dist/${{ matrix.pkg }}
           if-no-files-found: error
       - name: Upload legacy macOS DMG (arm64 only)
         if: matrix.legacy
@@ -174,6 +186,8 @@ jobs:
             artifacts/GateLink-macos-arm64-dmg/GateLink-arm64.dmg
             artifacts/GateLink-macos-x64-dmg/GateLink-x64.dmg
             artifacts/GateLink-macos-legacy-dmg/GateLink.dmg
+            artifacts/GateLink-macos-arm64-pkg/GateLink-arm64.pkg
+            artifacts/GateLink-macos-x64-pkg/GateLink-x64.pkg
             artifacts/GateLink-macos-arm64/GateLink-arm64.zip
             artifacts/GateLink-macos-x64/GateLink-x64.zip
             artifacts/GateLink-macos-arm64-signature/GateLink-arm64.dmg.sig
