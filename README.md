@@ -7,8 +7,8 @@ in one click. The VPN protocol is handled by the open-source
 [OpenConnect](https://www.infradead.org/openconnect/) engine bundled in the app.
 
 Written in Swift and SwiftUI. Requires macOS 14 Sonoma or later, on Apple
-Silicon or Intel. An iPhone version with the same screens is sideloaded from
-Xcode; see [iOS](#ios).
+Silicon or Intel. iPhone and Android versions with the same screens are
+sideloaded; see [iOS](#ios) and [Android](#android).
 
 ## How a connection works
 
@@ -35,6 +35,7 @@ as the app: quitting, a crash or Force Quit takes the tunnel down.
 | `GateLink/App/AppModel.swift`, `GateLink/Shared` | App state and views shared with the iOS app |
 | `GateLinkiOS/` | The iOS app; `Shared/GLOpenConnect.c` is the C layer over libopenconnect |
 | `GateLinkTunnel/` | The iOS Packet Tunnel extension that runs the tunnel |
+| `android/` | The Android app (Kotlin, Jetpack Compose) and its `VpnService` |
 | `GateLinkKit/` | Swift package with all logic, unit-tested with `swift test` |
 | `GateLinkKit/Sources/GateLinkKit/OTP` | Base32, RFC 6238 TOTP, `otpauth://` parsing, QR reading (Vision) |
 | `GateLinkKit/Sources/GateLinkKit/Vault` | Accounts, Keychain secret store, Touch ID gate with sliding relock |
@@ -44,7 +45,8 @@ as the app: quitting, a crash or Force Quit takes the tunnel down.
 | `scripts/install-tunnel-helper.sh` | Installs the wrapper, engine and sudoers rule |
 | `scripts/build-openconnect-engine.sh` | Builds OpenConnect + OpenSSL from pinned sources for macOS 14 |
 | `scripts/build-openconnect-ios.sh` | Builds static libopenconnect + OpenSSL for iOS into `Engine/ios` |
-| `scripts/engine-sources.sh` | The pinned source versions and checksums both engine builds use |
+| `scripts/build-openconnect-android.sh` | Builds libopenconnect with its Java bindings for Android (arm64) |
+| `scripts/engine-sources.sh` | The pinned source versions and checksums all engine builds use |
 | `scripts/bundle-openconnect.sh` | Stages the engine and its dylibs in `Engine/openconnect` |
 | `project.yml` | XcodeGen spec for `GateLink.xcodeproj` |
 
@@ -117,6 +119,41 @@ xcrun devicectl device install app --device <iPhone UDID> \
 
 Or open `GateLink.xcodeproj` and run the `GateLinkiOS` scheme on the phone.
 Tunnel logs are in Console.app under the subsystem `com.example.gatelink`.
+
+## Android
+
+The Android app has the same screens and needs Android 11 or later on an
+arm64 phone. One `VpnService` session does what the Mac splits in two:
+
+```
+Connect
+├─ fingerprint or screen lock unlocks the vault key (60 s)
+├─ Android's "Connection request" dialog, once
+└─ GateLinkVpnService (libopenconnect through its Java bindings)
+      login: password + OTP → cookie; the certificate must be trusted by
+      Android for the portal name you typed
+      tunnel: the gateway's address, split routes and DNS via VpnService.Builder;
+      the connection to the gateway itself stays outside the tunnel
+```
+
+Secrets are AES-GCM encrypted with an Android Keystore key that works for 60 s
+after you unlock, so the phone needs a screen lock. Turning the VPN off in
+Settings, or a lost tunnel after OpenConnect's own 5-minute reconnect, ends the
+session; press Connect again. Unlike the Mac app, it sends no HIP report.
+
+Build (Android SDK with NDK 29 and JDK 17; Android Studio provides both):
+
+```bash
+./scripts/build-openconnect-android.sh   # → android/app/src/main/jniLibs, LibOpenConnect.java
+cd android && ./gradlew assembleDebug    # → app/build/outputs/apk/debug/app-debug.apk
+./gradlew testDebugUnitTest              # OTP, account lookup, routes, certificate names
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+The debug APK is signed with Android's debug key, which is fine for your own
+phones. Releases attach `GateLink-android.apk`, signed with the GateLink key
+(see [docs/RELEASING.md](docs/RELEASING.md)); a phone with a debug build needs
+one uninstall before it can install a release APK.
 
 ## Security model
 
