@@ -98,6 +98,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSApplicationCategoryType: public.app-category.utilities
+        NSCameraUsageDescription: GateLink uses the camera to scan your 2FA QR code.
         NSFaceIDUsageDescription: GateLink uses Face ID before it reads your 2FA secret and VPN password.
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
