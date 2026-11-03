@@ -60,7 +60,9 @@ import Testing
         let session = makeSession()
         await auth.hold()
         let first = Task { await session.connect(gateway: "vpn.example.com", credentials: credentials()) }
-        #expect(await eventually { session.phase == .authenticating })
+        // The phase changes before the login task runs; wait for the held call itself.
+        #expect(await eventually { await auth.calls.count == 1 })
+        #expect(session.phase == .authenticating)
 
         await session.connect(gateway: "vpn.example.com", credentials: credentials())
         #expect(await auth.calls.count == 1)
@@ -130,7 +132,9 @@ import Testing
         let session = makeSession()
         await auth.hold()
         let task = Task { await session.connect(gateway: "vpn.example.com", credentials: credentials()) }
-        #expect(await eventually { session.phase == .authenticating })
+        // The phase changes before the login task runs; wait for the held call itself.
+        #expect(await eventually { await auth.calls.count == 1 })
+        #expect(session.phase == .authenticating)
 
         await session.cancel()
         await auth.release()

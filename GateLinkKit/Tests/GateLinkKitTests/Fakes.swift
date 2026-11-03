@@ -173,7 +173,7 @@ func eventually(_ condition: @MainActor () async -> Bool) async -> Bool {
 }
 
 /// Like `eventually`, but fast-forwards `clock` through pending sleeps
-/// (reconnect delays, OTP rollovers, health checks) while waiting.
+/// (reconnect delays, OTP rollovers) while waiting.
 @MainActor
 func drive(_ clock: TestClock, until condition: @MainActor () async -> Bool) async -> Bool {
     let deadline = Date().addingTimeInterval(2)
