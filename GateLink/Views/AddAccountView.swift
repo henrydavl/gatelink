@@ -49,10 +49,7 @@ struct AddAccountView: View {
             }
 
             if let error {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
+                ErrorCallout(message: error)
             }
 
             HStack {

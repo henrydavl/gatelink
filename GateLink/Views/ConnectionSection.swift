@@ -19,27 +19,41 @@ struct ConnectionSection: View {
                     .disabled(phase.isBusy)
             }
 
-            Button {
-                Task { await model.primaryAction() }
-            } label: {
-                Text(buttonTitle)
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(buttonTint)
-            .disabled(phase == .disconnecting)
-            .keyboardShortcut(.defaultAction)
+            primaryButton
+                .controlSize(.large)
+                .disabled(phase == .disconnecting)
 
             if let feedback {
-                Text(feedback)
-                    .font(.callout)
-                    .foregroundStyle(isError ? Color.red : Color.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
+                if isError {
+                    ErrorCallout(message: feedback)
+                } else {
+                    Text(feedback)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
             }
         }
         .padding(16)
+    }
+
+    /// Disconnect is a gray button with a red label; a solid red one is too loud.
+    /// It is not the Return-key default: macOS draws the default button blue,
+    /// and Return should never drop the VPN.
+    @ViewBuilder
+    private var primaryButton: some View {
+        let button = Button {
+            Task { await model.primaryAction() }
+        } label: {
+            Text(buttonTitle)
+                .frame(maxWidth: .infinity)
+        }
+        if phase.isConnected {
+            button.buttonStyle(.bordered).foregroundStyle(.red)
+        } else {
+            button.buttonStyle(.borderedProminent).tint(buttonTint).keyboardShortcut(.defaultAction)
+        }
     }
 
     private var form: some View {
@@ -100,8 +114,7 @@ struct ConnectionSection: View {
     private var statusColor: Color {
         switch phase {
         case .connected: .green
-        case .failed: .red
-        case .idle: .secondary
+        case .idle, .failed: .secondary
         default: .accentColor
         }
     }
@@ -117,8 +130,7 @@ struct ConnectionSection: View {
 
     private var buttonTint: Color {
         switch phase {
-        case .connected: .red
-        case .authenticating, .connecting, .reconnecting, .disconnecting: .gray
+        case .authenticating, .connecting, .reconnecting, .disconnecting, .connected: .gray
         case .idle, .failed: .accentColor
         }
     }
@@ -134,5 +146,28 @@ struct ConnectionSection: View {
         return !(message.hasPrefix("Added") || message.hasPrefix("Deleted") || message.hasPrefix("Code copied") || message.hasPrefix("Password saved")
             || message.hasPrefix("GateLink needs") || message.hasPrefix("The tunnel helper was removed")
             || message.hasSuffix("is up to date.") || message.hasPrefix("Update cancelled"))
+    }
+}
+
+/// An error message in a soft red box, calmer than red text.
+struct ErrorCallout: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.red)
+                .accessibilityHidden(true)
+            Text(message)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+            Spacer(minLength: 0)
+        }
+        .font(.callout)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Error: \(message)")
     }
 }
