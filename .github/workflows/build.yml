@@ -19,6 +19,8 @@ jobs:
       - name: Check shell scripts
         run: |
           for f in scripts/*.sh scripts/gatelink-tunnel scripts/pkg/*install; do bash -n "$f"; done
+      - name: Test the tunnel wrapper lifeline
+        run: ./scripts/test-gatelink-tunnel.sh
 
   # Build the macOS app for both CPU architectures. The bundled OpenConnect
   # engine is compiled from pinned sources with -mmacosx-version-min=14.0, so

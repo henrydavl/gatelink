@@ -4,6 +4,7 @@ import SwiftUI
 enum WindowID {
     static let addAccount = "add-account"
     static let requirements = "requirements"
+    static let password = "password"
 }
 
 @main
@@ -21,6 +22,13 @@ struct GateLinkApp: App {
 
         Window("Add Account", id: WindowID.addAccount) {
             AddAccountView(model: model)
+        }
+        .windowResizability(.contentSize)
+
+        // A real window, not the popover: the popover closes when the
+        // Passwords AutoFill picker takes focus, so AutoFill never lands.
+        Window("VPN Password", id: WindowID.password) {
+            PasswordView(model: model)
         }
         .windowResizability(.contentSize)
 

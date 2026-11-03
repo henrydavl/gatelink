@@ -69,7 +69,6 @@ public final class VPNSession {
     @ObservationIgnored private let now: @Sendable () -> Date
     @ObservationIgnored private let sleep: @Sendable (TimeInterval) async throws -> Void
     @ObservationIgnored private let establishTimeout: TimeInterval
-    @ObservationIgnored private let healthInterval: TimeInterval
 
     @ObservationIgnored private var credentials: CredentialProvider?
     @ObservationIgnored private var generation = 0
@@ -84,14 +83,12 @@ public final class VPNSession {
         authenticator: VPNAuthenticator,
         tunnel: TunnelController,
         establishTimeout: TimeInterval = 30,
-        healthInterval: TimeInterval = 15,
         now: @escaping @Sendable () -> Date = { Date() },
         sleep: @escaping @Sendable (TimeInterval) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }
     ) {
         self.authenticator = authenticator
         self.tunnel = tunnel
         self.establishTimeout = establishTimeout
-        self.healthInterval = healthInterval
         self.now = now
         self.sleep = sleep
     }
@@ -123,15 +120,11 @@ public final class VPNSession {
         await tearDown(to: .idle)
     }
 
-    /// Picks up a tunnel left running by an earlier app session (quitting the
-    /// app keeps the tunnel up).
-    public func adoptRunningTunnel(gateway: String?, credentials: @escaping CredentialProvider) async {
-        guard phase == .idle, let pid = await tunnel.runningTunnelPID(), phase == .idle else { return }
-        self.gateway = gateway
-        self.credentials = credentials
-        generation += 1
-        transition(to: .connected(since: now()))
-        watchAdopted(pid: pid, generation: generation)
+    /// The VPN lives only as long as the app. Stops a tunnel that an older
+    /// version left running after it quit.
+    public func stopLeftoverTunnel() async {
+        guard phase == .idle else { return }
+        await tunnel.stop()
     }
 
     // MARK: - Attempts
@@ -224,22 +217,6 @@ public final class VPNSession {
                 tunnelDropped()
             } else {
                 await attemptFailed(establishFailure(code), attempt: attempt, generation: current, stopTunnel: false)
-            }
-        }
-    }
-
-    private func watchAdopted(pid: Int32, generation current: Int) {
-        let interval = healthInterval
-        let sleep = self.sleep
-        let tunnel = self.tunnel
-        watcher = Task {
-            while true {
-                do { try await sleep(interval) } catch { return }
-                guard current == generation else { return }
-                if !tunnel.isProcessAlive(pid) {
-                    tunnelDropped()
-                    return
-                }
             }
         }
     }

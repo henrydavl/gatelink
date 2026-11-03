@@ -23,8 +23,8 @@ Connect
 ```
 
 If the tunnel drops while connected, GateLink logs in again with a fresh code
-(three attempts: after 2, 5 and 10 seconds). Quitting the app leaves the
-tunnel running; the next launch picks it up.
+(three attempts: after 2, 5 and 10 seconds). The VPN lives only as long
+as the app: quitting, a crash or Force Quit takes the tunnel down.
 
 ## Layout
 

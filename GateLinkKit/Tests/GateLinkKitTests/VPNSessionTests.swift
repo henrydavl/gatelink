@@ -191,16 +191,15 @@ import Testing
         #expect(await auth.calls.count == 1)
     }
 
-    @Test func adoptsARunningTunnelAndNoticesWhenItDies() async {
-        let session = makeSession(reconnect: ReconnectPolicy(isEnabled: false))
-        await tunnel.setRunningPID(4242)
-        await session.adoptRunningTunnel(gateway: "vpn.example.com", credentials: credentials())
-        #expect(session.phase.isConnected)
+    @Test func stopsALeftoverTunnelOnlyWhenIdle() async {
+        let session = makeSession()
+        await session.stopLeftoverTunnel()
+        #expect(await tunnel.stops == 1)
 
-        clock.advanceToNextDeadline()
+        await connect(session)
+        await session.stopLeftoverTunnel()
         #expect(session.phase.isConnected)
-        tunnel.alive = false
-        #expect(await drive(clock) { session.phase == .failed("The VPN connection was lost.") })
+        #expect(await tunnel.stops == 1)
     }
 
     @Test func connectIsAllowedAgainAfterAFailure() async {

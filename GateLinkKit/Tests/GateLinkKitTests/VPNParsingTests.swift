@@ -49,14 +49,6 @@ import Testing
         #expect(!TunnelArgs.isValidFingerprint("sha256:ab cd"))
         #expect(!TunnelArgs.isValidFingerprint(""))
     }
-
-    @Test func parsesOnlySafePIDs() {
-        #expect(TunnelArgs.tunnelPID(from: " 4242\n") == 4242)
-        #expect(TunnelArgs.tunnelPID(from: "1") == nil)
-        #expect(TunnelArgs.tunnelPID(from: "0") == nil)
-        #expect(TunnelArgs.tunnelPID(from: "-5") == nil)
-        #expect(TunnelArgs.tunnelPID(from: "12abc") == nil)
-    }
 }
 
 @Suite struct OpenConnectOutputTests {

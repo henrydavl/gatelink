@@ -4,6 +4,7 @@ import SwiftUI
 /// Status line, credential form and the Connect / Cancel / Disconnect button.
 struct ConnectionSection: View {
     @Bindable var model: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     private var phase: VPNPhase { model.session.phase }
 
@@ -53,20 +54,26 @@ struct ConnectionSection: View {
                 Text("Username")
                 TextField("Username", text: $model.username, prompt: Text("VPN username"))
                     .labelsHidden()
-                    .textContentType(.username)
             }
             GridRow {
                 Text("Password")
-                SecureField("Password", text: $model.password, prompt: Text(passwordPrompt))
-                    .labelsHidden()
-                    .textContentType(.password)
+                HStack {
+                    Text(hasPassword ? "Saved in Keychain" : "Not set")
+                        .foregroundStyle(hasPassword ? Color.secondary : Color.orange)
+                    Spacer()
+                    Button(hasPassword ? "Change…" : "Set…") {
+                        openWindow(id: WindowID.password)
+                        NSApp.activate()
+                    }
+                    .disabled(model.account == nil)
+                }
             }
         }
         .font(.callout)
     }
 
-    private var passwordPrompt: String {
-        model.account?.hasPassword == true ? "Saved in Keychain" : "VPN password"
+    private var hasPassword: Bool {
+        model.account?.hasPassword == true
     }
 
     private var statusText: String {
@@ -124,7 +131,7 @@ struct ConnectionSection: View {
     private var isError: Bool {
         if case .failed = phase, model.message == nil { return true }
         guard let message = model.message else { return false }
-        return !(message.hasPrefix("Added") || message.hasPrefix("Deleted") || message.hasPrefix("Code copied")
+        return !(message.hasPrefix("Added") || message.hasPrefix("Deleted") || message.hasPrefix("Code copied") || message.hasPrefix("Password saved")
             || message.hasPrefix("GateLink needs") || message.hasPrefix("The tunnel helper was removed"))
     }
 }

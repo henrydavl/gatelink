@@ -15,7 +15,8 @@ but do not yet deliver; they are candidates for contribution.
 > **v2 (Swift) note.** Requirement IDs below were written against the .NET
 > app. The Swift rewrite closes VPN-12 (auto-reconnect), part of ACC-8 (a
 > Switch Account menu) and the double-connect bug, and replaces `expect` with a
-> native PTY. Out of scope for v2: UPD-1/2 (in-app updater) and all Windows
+> native PTY. VPN-10 is reversed by request: the tunnel stops when the app
+> exits for any reason. Out of scope for v2: UPD-1/2 (in-app updater) and all Windows
 > items (PRV-4, APP-5 Windows, UPD-4). Architecture section 6 is superseded by
 > the layout table in the README.
 

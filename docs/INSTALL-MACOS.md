@@ -38,9 +38,10 @@ login password) to save the secret in the Keychain.
 
 ## 3. Connect
 
-1. Enter the **Portal** (for example `vpn.example.com`), your **Username** and
-   **Password**. The password is saved in the Keychain after the first
-   connect; afterwards leave the field empty.
+1. Enter the **Portal** (for example `vpn.example.com`) and check your
+   **Username**. Next to **Password**, press **Set…** and enter your VPN
+   password (or pick it with the Passwords app). It is saved in the Keychain,
+   so you do this once.
 2. Press **Connect**.
 3. If you installed from the DMG, the first Connect asks for an
    administrator password to install GateLink's tunnel helper (the `.pkg`
@@ -55,12 +56,16 @@ connected. If the connection drops, GateLink reconnects with a fresh code.
 
 ## 4. Everyday use
 
-- **See or copy the code**: the eye button shows it; **… → Copy Code**
-  copies it. Both need Touch ID unless you unlocked in the last minute.
-- **Several accounts**: **… → Switch Account**, or type the other account's
-  username.
+- **See or copy the code**: the eye button shows it; click the code or the
+  copy button beside it to copy it. Both need Touch ID unless you unlocked in
+  the last minute.
+- **Several accounts**: pick one from the arrows next to the account name, or
+  type the other account's username. Its username fills in for you.
+- **Password**: **Change…** next to Password opens the password window; its
+  eye button shows what you typed.
 - **Open at Login**: checkbox at the bottom of the popover.
-- **Quit** leaves the VPN connected. Disconnect first if you want it off.
+- **Quit** disconnects the VPN. So does a crash or Force Quit: the tunnel
+  never outlives the app.
 
 ## 5. If something fails
 

@@ -105,7 +105,21 @@ private struct AccountRow: View {
                 accountSwitcher
             }
             Spacer(minLength: 8)
-            CodeView(totp: model.revealed)
+            Button {
+                Task { await model.copyCode() }
+            } label: {
+                CodeView(totp: model.revealed)
+            }
+            .buttonStyle(.plain)
+            .help("Copy code")
+            Button {
+                Task { await model.copyCode() }
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.borderless)
+            .help("Copy code")
+            .accessibilityLabel("Copy code")
             Button {
                 Task { await model.toggleReveal() }
             } label: {
@@ -116,7 +130,6 @@ private struct AccountRow: View {
             .accessibilityLabel(model.revealed == nil ? "Show code" : "Hide code")
 
             Menu {
-                Button("Copy Code") { Task { await model.copyCode() } }
                 Button("Requirements…") { openWindow(WindowID.requirements) }
                 Divider()
                 Button("Delete Account…", role: .destructive) { confirmDelete = true }
@@ -174,7 +187,6 @@ private struct CodeView: View {
                     Text(Self.grouped(totp.code(at: context.date)))
                         .font(.system(.title3, design: .monospaced))
                         .contentTransition(.numericText())
-                        .textSelection(.enabled)
                     Countdown(remaining: totp.secondsRemaining(at: context.date), period: totp.period)
                 } else {
                     Text("••• •••")

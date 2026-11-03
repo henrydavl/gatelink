@@ -16,10 +16,18 @@ window: everything happens in a 380×560 popover anchored under the tray icon.
 >   a retry within the same 30 s waits for the next code.
 > - Login runs in a native pseudo-terminal (no `expect`); a second password
 >   prompt fails fast instead of waiting for a timeout.
-> - The password field is empty with "Saved in Keychain" once a password is
->   stored; "Fill saved password" and "Auto-unlock on launch" are gone.
-> - Add Account accepts dropped or pasted QR images; **… → Switch Account**
->   appears with more than one account.
+> - The password is set in its own window (**Set…** / **Change…** next to
+>   Password), so the Passwords app can AutoFill it; the popover only shows
+>   "Saved in Keychain". "Fill saved password" and "Auto-unlock on launch" are
+>   gone.
+> - Quit, a crash or Force Quit disconnects the VPN (Flow 7 no longer
+>   applies): the root wrapper stops the tunnel when the app's stdin
+>   lifeline closes. A tunnel left by an older version is stopped at launch.
+> - Add Account accepts dropped or pasted QR images. With more than one
+>   account, arrows next to the account name switch accounts and fill in the
+>   username; typing a saved username selects its account.
+> - Clicking the code, or the copy button beside it, copies it. The password
+>   field has a show/hide button.
 > - Open at Login uses `SMAppService`; there is no in-app updater yet.
 > - Windows is no longer supported.
 

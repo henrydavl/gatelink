@@ -20,8 +20,6 @@ final class AppModel {
             }
         }
     }
-    /// A newly typed password. Empty means "use the saved one".
-    var password = ""
     /// Feedback that is not part of the connection phase.
     var message: String?
     /// Generator for the visible code; dropped when the vault relocks.
@@ -61,7 +59,7 @@ final class AppModel {
         removeLegacyLaunchAgent()
         refreshOpenAtLogin()
         startRelockTicker()
-        Task { await adoptRunningTunnel() }
+        Task { await session.stopLeftoverTunnel() }
     }
 
     // MARK: - Accounts
@@ -104,6 +102,21 @@ final class AppModel {
             message = "Deleted \(account.issuer)."
         } catch {
             message = error.localizedDescription
+        }
+    }
+
+    /// Saves the VPN password for the selected account. Returns false if the
+    /// user cancelled the unlock prompt.
+    func savePassword(_ password: String) async -> Bool {
+        guard let account else { return false }
+        guard await vault.unlock(reason: "Save the VPN password for \(account.username)") else { return false }
+        do {
+            try vault.setPassword(password, for: account)
+            message = "Password saved."
+            return true
+        } catch {
+            message = error.localizedDescription
+            return false
         }
     }
 
@@ -172,6 +185,10 @@ final class AppModel {
             message = "Enter your VPN username."
             return
         }
+        guard account.hasPassword else {
+            message = "Set your VPN password first."
+            return
+        }
         gateway = portal
         UserDefaults.standard.set(portal, forKey: Self.gatewayKey)
 
@@ -185,18 +202,6 @@ final class AppModel {
             if account.username != login {
                 account.username = login
                 try vault.update(account)
-            }
-
-            if !password.isEmpty {
-                guard await vault.unlock(reason: "Connect to \(portal)") else {
-                    message = "Unlock cancelled. VPN not connected."
-                    return
-                }
-                try vault.setPassword(password, for: account)
-                password = ""
-            } else if !account.hasPassword {
-                message = "Enter your VPN password."
-                return
             }
         } catch {
             message = error.localizedDescription
@@ -215,19 +220,10 @@ final class AppModel {
                 return nil
             }
             guard let password = secret.vpnPassword, !password.isEmpty else {
-                throw GateLinkError("No VPN password is saved for \(account.username). Enter it and press Connect.")
+                throw GateLinkError("No VPN password is saved for \(account.username). Set it and press Connect.")
             }
             return VPNCredentials(username: account.username, password: password, totp: try secret.makeTOTP(for: account))
         }
-    }
-
-    private func adoptRunningTunnel() async {
-        guard let account else { return }
-        let portal = gateway.isEmpty ? nil : gateway
-        await session.adoptRunningTunnel(
-            gateway: portal,
-            credentials: credentials(for: account.id, gateway: portal ?? "the VPN")
-        )
     }
 
     // MARK: - System
@@ -281,7 +277,7 @@ final class AppModel {
     }
 
     func quit() {
-        // The tunnel keeps running; the next launch adopts it.
+        // The tunnel helper sees its stdin close and stops the VPN.
         NSApp.terminate(nil)
     }
 

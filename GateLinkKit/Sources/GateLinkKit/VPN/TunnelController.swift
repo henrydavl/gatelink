@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 
 public enum TunnelEvent: Equatable, Sendable {
@@ -13,14 +12,13 @@ public enum TunnelEvent: Equatable, Sendable {
 public protocol TunnelController: Sendable {
     func start(host: String, fingerprint: String, cookie: String) async throws -> AsyncStream<TunnelEvent>
     func stop() async
-    /// The PID of a tunnel left running by an earlier app session, if any.
-    func runningTunnelPID() async -> Int32?
-    func isProcessAlive(_ pid: Int32) -> Bool
 }
 
 /// Runs the tunnel through the root-owned `gatelink-tunnel` wrapper via
 /// `sudo -n`. The wrapper builds the openconnect command line itself; the app
 /// only passes a validated host and certificate pin, and the cookie on stdin.
+/// stdin stays open as a lifeline: when this process exits, however it exits,
+/// the wrapper sees EOF and stops the tunnel.
 public actor HelperTunnelController: TunnelController {
     private let helperPath: String
     private let log: TunnelLog
@@ -102,19 +100,6 @@ public actor HelperTunnelController: TunnelController {
         try? input?.fileHandleForWriting.close()
         process = nil
         input = nil
-    }
-
-    public func runningTunnelPID() async -> Int32? {
-        guard FileManager.default.isExecutableFile(atPath: helperPath),
-              let result = try? await ProcessRunner.run("/usr/bin/sudo", ["-n", helperPath, "status"], timeout: 10),
-              result.status == 0
-        else { return nil }
-        return TunnelArgs.tunnelPID(from: result.output)
-    }
-
-    public nonisolated func isProcessAlive(_ pid: Int32) -> Bool {
-        // The tunnel is owned by root: EPERM still means it exists.
-        kill(pid, 0) == 0 || errno == EPERM
     }
 }
 

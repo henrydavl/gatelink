@@ -16,10 +16,4 @@ public enum TunnelArgs {
         guard !fingerprint.isEmpty, fingerprint.count <= 200, !fingerprint.hasPrefix("-") else { return false }
         return fingerprint.wholeMatch(of: #/[A-Za-z0-9:._+\/=\-]+/#) != nil
     }
-
-    /// A PID that is safe to signal: a number above 1.
-    public static func tunnelPID(from text: String) -> Int32? {
-        guard let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)), pid > 1 else { return nil }
-        return pid
-    }
 }

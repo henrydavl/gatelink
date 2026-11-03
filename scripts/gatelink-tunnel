@@ -13,6 +13,7 @@
 #
 # Callers:
 #   gatelink-tunnel connect --host <host> --fingerprint <pin>
+#       (cookie on stdin; the tunnel stops when stdin closes)
 #   gatelink-tunnel stop
 #   gatelink-tunnel status
 #   gatelink-tunnel version
@@ -132,9 +133,30 @@ cmd_connect() {
     fi
     args+=("${host}")
 
-    # stdin carries the WebVPN cookie from the unprivileged app. The wrapper
-    # never reads it, so openconnect receives it directly.
-    exec "${OC}" "${args[@]}"
+    # stdin carries the WebVPN cookie from the unprivileged app, then stays
+    # open as a lifeline: the app holds it for as long as it runs, and the
+    # kernel closes it when the app quits, crashes or is force-quit.
+    local cookie=""
+    IFS= read -r cookie || die "no cookie on stdin"
+    [[ -n "${cookie}" ]] || die "empty cookie"
+
+    # Background jobs get /dev/null as stdin; keep the lifeline on fd 3.
+    exec 3<&0
+    printf '%s\n' "${cookie}" | "${OC}" "${args[@]}" 3<&- &
+    local oc=$!
+    cookie=""
+    trap '/bin/kill -TERM "${oc}" 2>/dev/null || true' TERM INT HUP
+    ( /bin/cat <&3 >/dev/null; /bin/kill -TERM "${oc}" 2>/dev/null ) &
+    local lifeline=$!
+
+    local status=0
+    # wait returns early when a trapped signal arrives; wait again for the exit.
+    wait "${oc}" || status=$?
+    while /bin/kill -0 "${oc}" 2>/dev/null; do
+        wait "${oc}" || status=$?
+    done
+    /bin/kill "${lifeline}" 2>/dev/null || true
+    exit "${status}"
 }
 
 stop_pid() {

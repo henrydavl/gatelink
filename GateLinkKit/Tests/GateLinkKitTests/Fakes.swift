@@ -129,8 +129,6 @@ actor FakeTunnel: TunnelController {
     private(set) var stops = 0
     private var continuation: AsyncStream<TunnelEvent>.Continuation?
     private var startWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
-    var runningPID: Int32?
-    nonisolated(unsafe) var alive = true
 
     func start(host: String, fingerprint: String, cookie: String) async throws -> AsyncStream<TunnelEvent> {
         starts.append(Start(host: host, fingerprint: fingerprint, cookie: cookie))
@@ -147,12 +145,6 @@ actor FakeTunnel: TunnelController {
         continuation?.finish()
         continuation = nil
     }
-
-    func runningTunnelPID() async -> Int32? { runningPID }
-
-    func setRunningPID(_ pid: Int32?) { runningPID = pid }
-
-    nonisolated func isProcessAlive(_ pid: Int32) -> Bool { alive }
 
     func emit(_ event: TunnelEvent) {
         continuation?.yield(event)
