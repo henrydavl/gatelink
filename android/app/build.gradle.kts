@@ -4,7 +4,7 @@ plugins {
 }
 
 // CI passes the release tag's version (-PgatelinkVersion=2.0.7); 2.0.7 → code 20007.
-val gatelinkVersion = (findProperty("gatelinkVersion") as String?) ?: "2.0.6"
+val gatelinkVersion = (findProperty("gatelinkVersion") as String?) ?: "2.0.7"
 // Release signing key from CI secrets; without it the release APK is unsigned.
 val keystore = System.getenv("GATELINK_KEYSTORE")
 val keystorePassword = System.getenv("GATELINK_KEYSTORE_PASSWORD")
