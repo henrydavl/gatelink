@@ -28,7 +28,7 @@ set -euo pipefail
 
 HELPER_DIR="/usr/local/libexec/gatelink"
 SUDOERS_FILE="/etc/sudoers.d/gatelink"
-HELPER_VERSION="6"
+HELPER_VERSION="7"
 
 TARGET_USER="${SUDO_USER:-$(stat -f '%Su' /dev/console 2>/dev/null || true)}"
 UNINSTALL=0

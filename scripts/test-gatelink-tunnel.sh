@@ -16,6 +16,7 @@ cat > "$BASE/openconnect" <<'FAKE'
 #!/bin/bash
 IFS= read -r cookie
 echo "cookie=${cookie}" > "${GATELINK_HELPER_BASE}/seen"
+echo "args=$*" >> "${GATELINK_HELPER_BASE}/seen"
 echo $$ > "${GATELINK_HELPER_BASE}/oc.pid"
 while :; do sleep 0.1; done
 FAKE
@@ -31,10 +32,10 @@ wait_for() { # condition, seconds
     return 1
 }
 
-start() { # opens the lifeline on fd 4 and starts the wrapper
+start() { # opens the lifeline on fd 4 and starts the wrapper; arguments go to connect
     rm -f "$BASE/seen" "$BASE/oc.pid" "$BASE/fifo"
     mkfifo "$BASE/fifo"
-    "$WRAPPER" connect --host vpn.example.com --fingerprint pin-sha256:AbC= < "$BASE/fifo" &
+    "$WRAPPER" connect --host vpn.example.com --fingerprint pin-sha256:AbC= "$@" < "$BASE/fifo" &
     WRAPPER_PID=$!
     exec 4>"$BASE/fifo"
     echo "authcookie=abc" >&4
@@ -56,12 +57,14 @@ rejects "a host that is an option" connect --host -oProxy=x --fingerprint pin-sh
 rejects "a host with a path" connect --host vpn.example.com/x --fingerprint pin-sha256:AbC=
 rejects "a fingerprint that is an option" connect --host vpn.example.com --fingerprint --script=/tmp/x
 rejects "an extra option" connect --host vpn.example.com --fingerprint pin-sha256:AbC= --script /tmp/x
+rejects "a value on --esp" connect --host vpn.example.com --fingerprint pin-sha256:AbC= --esp=x
 rejects "a removed command" status
 echo "ok: bad input and unapproved portals are refused"
 
 # 2. openconnect gets the cookie; closing the lifeline stops it.
 start
 grep -qx "cookie=authcookie=abc" "$BASE/seen" || fail "cookie not passed to openconnect"
+grep -q -- "--no-dtls" "$BASE/seen" || fail "default tunnel is not TCP/TLS only"
 kill -0 "$OC_PID" || fail "openconnect exited early"
 exec 4>&-
 wait_for '! kill -0 "$OC_PID" 2>/dev/null' 5 || fail "openconnect still running after the lifeline closed"
@@ -74,3 +77,12 @@ kill -TERM "$WRAPPER_PID"
 wait_for '! kill -0 "$OC_PID" 2>/dev/null' 5 || fail "openconnect still running after SIGTERM"
 exec 4>&-
 echo "ok: SIGTERM stops the tunnel"
+
+# 4. --esp only drops --no-dtls, so openconnect may use ESP.
+start --esp
+! grep -q -- "--no-dtls" "$BASE/seen" || fail "--esp still passed --no-dtls"
+grep -q -- "--protocol=gp" "$BASE/seen" || fail "--esp changed the other options"
+kill -TERM "$WRAPPER_PID"
+wait_for '! kill -0 "$OC_PID" 2>/dev/null' 5 || fail "openconnect still running after SIGTERM"
+exec 4>&-
+echo "ok: --esp allows ESP"

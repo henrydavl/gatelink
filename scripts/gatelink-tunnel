@@ -13,7 +13,7 @@
 # program running as the user cannot point the root tunnel at its own server.
 #
 # Callers:
-#   gatelink-tunnel connect --host <host> --fingerprint <pin>
+#   gatelink-tunnel connect --host <host> --fingerprint <pin> [--esp]
 #       (cookie on stdin; the tunnel stops when stdin closes)
 #   gatelink-tunnel stop
 #   gatelink-tunnel version
@@ -99,9 +99,13 @@ ensure_not_running() {
 cmd_connect() {
     require_root
 
-    local host="" fingerprint=""
+    local host="" fingerprint="" use_esp=0
     while (( $# )); do
         case "${1}" in
+            --esp)
+                use_esp=1
+                shift
+                ;;
             --host)
                 [[ $# -ge 2 ]] || die "--host requires a value"
                 host="${2}"
@@ -132,7 +136,12 @@ cmd_connect() {
         "--servercert=${fingerprint}"
         "--reconnect-timeout=300"
         "--force-dpd=30"
-        "--no-dtls"
+    )
+    # --no-dtls keeps a gp tunnel on TCP/TLS; without it openconnect tries ESP (UDP).
+    if (( ! use_esp )); then
+        args+=("--no-dtls")
+    fi
+    args+=(
         "--script=${VPNC_SCRIPT}"
         "--pid-file=${PIDFILE}"
     )
@@ -229,6 +238,6 @@ case "${1:-}" in
         cmd_version
         ;;
     *)
-        die "usage: gatelink-tunnel connect --host <host> --fingerprint <pin> | stop | version"
+        die "usage: gatelink-tunnel connect --host <host> --fingerprint <pin> [--esp] | stop | version"
         ;;
 esac

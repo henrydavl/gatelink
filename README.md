@@ -27,6 +27,9 @@ If the tunnel drops while connected, GateLink logs in again with a fresh code
 (three attempts: after 2, 5 and 10 seconds). The VPN lives only as long
 as the app: quitting, a crash or Force Quit takes the tunnel down.
 
+The tunnel uses TCP/TLS by default. On the Mac, **… → Use ESP (UDP) Tunnel** lets
+OpenConnect use ESP from the next Connect; it stays on TLS if ESP doesn't come up.
+
 ## Layout
 
 | Path | What it is |

@@ -32,6 +32,10 @@ final class AppModel {
     #if os(macOS)
     let resources: AppResources
     var openAtLogin = false
+    /// Tunnel over ESP (UDP) instead of TCP/TLS; applies on the next Connect.
+    var useESP = UserDefaults.standard.bool(forKey: AppModel.useESPKey) {
+        didSet { UserDefaults.standard.set(useESP, forKey: Self.useESPKey) }
+    }
     var requirements: [Requirement] = []
     var availableUpdate: AppUpdate?
     var updateStep: UpdateStep?
@@ -51,6 +55,9 @@ final class AppModel {
 
     private static let gatewayKey = "gateway"
     private static let selectedAccountKey = "selectedAccount"
+    #if os(macOS)
+    nonisolated private static let useESPKey = "useESP"
+    #endif
 
     init() {
         vault = Vault()
@@ -60,7 +67,7 @@ final class AppModel {
         let engine = resources.openConnectURL ?? URL(fileURLWithPath: "/opt/homebrew/bin/openconnect")
         session = VPNSession(
             authenticator: OpenConnectAuthenticator(executableURL: engine),
-            tunnel: HelperTunnelController()
+            tunnel: HelperTunnelController(useESP: { UserDefaults.standard.bool(forKey: AppModel.useESPKey) })
         )
         #else
         tunnel = PacketTunnelController()

@@ -23,6 +23,17 @@ import Testing
 }
 
 @Suite struct TunnelArgsTests {
+    @Test func asksForESPOnlyWhenEnabled() {
+        let base = ["-n", "/helper", "connect", "--host", "vpn.example.com", "--fingerprint", "pin-sha256:AbC="]
+        func arguments(useESP: Bool) -> [String] {
+            HelperTunnelController.arguments(
+                helperPath: "/helper", host: "vpn.example.com", fingerprint: "pin-sha256:AbC=", useESP: useESP
+            )
+        }
+        #expect(arguments(useESP: false) == base)
+        #expect(arguments(useESP: true) == base + ["--esp"])
+    }
+
     @Test(arguments: ["vpn.example.com", "203.0.113.10", "a", "gw-1.corp.example"])
     func acceptsHosts(_ host: String) {
         #expect(TunnelArgs.isValidHost(host))

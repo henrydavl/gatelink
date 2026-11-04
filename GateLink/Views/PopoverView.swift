@@ -166,6 +166,11 @@ private struct AccountRow: View {
                 Button("Requirements…") { openWindow(WindowID.requirements) }
                 Button("Check for Updates") { Task { await model.checkForUpdate() } }
                     .disabled(model.updateStep != nil)
+                Toggle("Use ESP (UDP) Tunnel", isOn: Binding(
+                    get: { model.useESP },
+                    set: { model.useESP = $0 }
+                ))
+                .disabled(!model.canSwitchAccount)
                 Divider()
                 Button("Delete Account…", role: .destructive) { confirmDelete = true }
             } label: {

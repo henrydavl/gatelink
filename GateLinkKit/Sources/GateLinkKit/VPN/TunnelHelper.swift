@@ -13,7 +13,7 @@ public struct TunnelHelper: Sendable {
     public static let versionPath = directory + "/VERSION"
     public static let allowedGatewaysPath = directory + "/allowed-gateways"
     public static let sudoersPath = "/etc/sudoers.d/gatelink"
-    public static let expectedVersion = "6"
+    public static let expectedVersion = "7"
 
     /// `install-tunnel-helper.sh` inside the app bundle.
     public var installerURL: URL?

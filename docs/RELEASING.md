@@ -92,7 +92,7 @@ Installer certificate).
 ## Upgrading from the .NET app (v0.1.x)
 
 - The Swift app keeps the bundle ID `com.gatelink.app`. It needs tunnel
-  helper v6 (v4 came with the .NET app), so the `.pkg`, or else the first
+  helper v7 (v4 came with the .NET app), so the `.pkg`, or else the first
   Connect, upgrades the helper and replaces any old NOPASSWD sudoers rule.
   Bump `HELPER_VERSION` in `scripts/install-tunnel-helper.sh` and
   `TunnelHelper.expectedVersion` together.

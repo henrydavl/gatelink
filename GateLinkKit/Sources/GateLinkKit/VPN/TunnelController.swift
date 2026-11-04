@@ -30,10 +30,21 @@ public actor HelperTunnelController: TunnelController {
     private let log: TunnelLog
     private var process: Process?
     private var input: Pipe?
+    /// Read on every start, so reconnects keep the mode.
+    private let useESP: @Sendable () -> Bool
 
-    public init(helperPath: String = TunnelHelper.helperPath, log: TunnelLog = TunnelLog()) {
+    public init(
+        helperPath: String = TunnelHelper.helperPath,
+        log: TunnelLog = TunnelLog(),
+        useESP: @escaping @Sendable () -> Bool = { false }
+    ) {
         self.helperPath = helperPath
         self.log = log
+        self.useESP = useESP
+    }
+
+    static func arguments(helperPath: String, host: String, fingerprint: String, useESP: Bool) -> [String] {
+        ["-n", helperPath, "connect", "--host", host, "--fingerprint", fingerprint] + (useESP ? ["--esp"] : [])
     }
 
     public func start(host: String, fingerprint: String, cookie: String) async throws -> AsyncStream<TunnelEvent> {
@@ -46,7 +57,7 @@ public actor HelperTunnelController: TunnelController {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/sudo")
-        process.arguments = ["-n", helperPath, "connect", "--host", host, "--fingerprint", fingerprint]
+        process.arguments = Self.arguments(helperPath: helperPath, host: host, fingerprint: fingerprint, useESP: useESP())
         let input = Pipe()
         let output = Pipe()
         process.standardInput = input
