@@ -93,6 +93,37 @@ private struct AccountRow: View {
     @State private var confirmDelete = false
 
     var body: some View {
+        Group {
+            if confirmDelete { deleteConfirmation } else { accountRow }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    /// Inline because a confirmationDialog's Delete button never fires in the menu bar window.
+    private var deleteConfirmation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Delete \(account.issuer)?")
+                .font(.headline)
+                .lineLimit(1)
+            Text("The 2FA secret and saved password are removed from this Mac.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button("Cancel") { confirmDelete = false }
+                    .keyboardShortcut(.cancelAction)
+                Button("Delete", role: .destructive) {
+                    confirmDelete = false
+                    Task { await model.deleteCurrentAccount() }
+                }
+                .foregroundStyle(.red)
+            }
+        }
+    }
+
+    private var accountRow: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.issuer)
@@ -144,13 +175,6 @@ private struct AccountRow: View {
             .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel("More")
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .confirmationDialog("Delete \(account.issuer)?", isPresented: $confirmDelete) {
-            Button("Delete", role: .destructive) { Task { await model.deleteCurrentAccount() } }
-        } message: {
-            Text("The 2FA secret and saved password are removed from this Mac.")
         }
     }
 
