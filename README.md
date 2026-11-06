@@ -1,200 +1,97 @@
 # GateLink
 
-A native macOS menu bar client for **GlobalProtect** VPN gateways that use a
-password plus a TOTP code. GateLink keeps the 2FA secret and VPN password in
-the Keychain behind Touch ID, generates the 6-digit code itself, and connects
-in one click. The VPN protocol is handled by the open-source
-[OpenConnect](https://www.infradead.org/openconnect/) engine bundled in the app.
+A macOS menu bar helper that logs you in to the official **GlobalProtect** app
+with one click, for gateways that use a password plus a TOTP code. GateLink keeps
+the 2FA secret and VPN password in the Keychain behind Touch ID, generates the
+6-digit code itself, and fills in GlobalProtect's login window for you.
 
-Written in Swift and SwiftUI. Requires macOS 14 Sonoma or later, on Apple
-Silicon or Intel. iPhone and Android versions with the same screens are
-sideloaded; see [iOS](#ios) and [Android](#android).
+GateLink does not make a VPN connection. GlobalProtect does, as if you had typed
+the login yourself, and sends its own device (HIP) report.
 
-## How a connection works
+Written in Swift and SwiftUI. Requires macOS 14 Sonoma or later, on Apple Silicon
+or Intel, with GlobalProtect installed and running.
+
+## How a login works
 
 ```
 Connect
-  ├─ Touch ID unlocks the vault (one unlock lasts 60 s of activity)
-  ├─ openconnect --protocol=gp --usergroup=gateway -u <user> --authenticate <portal>
-  │     run in a pseudo-terminal; the single prompt gets <password><6-digit OTP>
-  │     → session cookie + server certificate pin
-  └─ sudo -n /usr/local/libexec/gatelink/gatelink-tunnel connect --host <h> --fingerprint <pin>
-        root-owned wrapper starts openconnect with fixed options; cookie on stdin
-        → "Connected" once openconnect reports the tunnel is up (≤ 30 s)
+  ├─ check Accessibility permission, and that the running GlobalProtect is
+  │    signed by Palo Alto Networks (team PXPZ95SK77)
+  ├─ Touch ID unlocks the vault, every time
+  ├─ if the code expires within 8 s, or was already used, wait for the next one
+  ├─ press GlobalProtect's menu bar icon, then Connect on the portal screen
+  ├─ fill Username and Password (<password><6-digit code>), press Connect once
+  └─ wait for GlobalProtect to report the connection
 ```
 
-If the tunnel drops while connected, GateLink logs in again with a fresh code
-(three attempts: after 2, 5 and 10 seconds). The VPN lives only as long
-as the app: quitting, a crash or Force Quit takes the tunnel down.
+GateLink tries **once** per Connect, because repeated bad logins can lock the
+account. It also follows `pan_gp_event.log`, so a login by hand shows as connected.
+When the session ends you get a notification; clicking it starts a new login.
 
-The tunnel uses TCP/TLS by default. On the Mac, **… → Use ESP (UDP) Tunnel** lets
-OpenConnect use ESP from the next Connect; it stays on TLS if ESP doesn't come up.
+GateLink recognises GlobalProtect 6.0's English labels. If an update changes them,
+Connect fails with a message and you can log in to GlobalProtect by hand.
 
 ## Layout
 
 | Path | What it is |
 |------|------------|
-| `GateLink/` | The SwiftUI app: menu bar popover, Add Account and Requirements windows |
-| `GateLink/App/AppModel.swift`, `GateLink/Shared` | App state and views shared with the iOS app |
-| `GateLinkiOS/` | The iOS app; `Shared/GLOpenConnect.c` is the C layer over libopenconnect |
-| `GateLinkTunnel/` | The iOS Packet Tunnel extension that runs the tunnel |
-| `android/` | The Android app (Kotlin, Jetpack Compose) and its `VpnService` |
+| `GateLink/` | The SwiftUI app: menu bar popover, Add Account and password windows |
 | `GateLinkKit/` | Swift package with all logic, unit-tested with `swift test` |
+| `GateLinkKit/Sources/GateLinkKit/GlobalProtect` | The login flow and the Accessibility calls into GlobalProtect |
 | `GateLinkKit/Sources/GateLinkKit/OTP` | Base32, RFC 6238 TOTP, `otpauth://` parsing, QR reading (Vision) |
-| `GateLinkKit/Sources/GateLinkKit/Vault` | Accounts, Keychain secret store, Touch ID gate with sliding relock |
+| `GateLinkKit/Sources/GateLinkKit/Vault` | Accounts, Keychain secret store, Touch ID gate |
 | `GateLinkKit/Sources/GateLinkKit/Update` | Release check, checksum-verified `.pkg` download, install and relaunch |
-| `GateLinkKit/Sources/GateLinkKit/VPN` | PTY login, cookie parsing, tunnel controller, helper installer, `VPNSession` state machine |
-| `scripts/gatelink-tunnel` | Root-owned wrapper; the only command sudoers allows |
-| `scripts/install-tunnel-helper.sh` | Installs the wrapper, engine and sudoers rule |
-| `scripts/build-openconnect-engine.sh` | Builds OpenConnect + OpenSSL from pinned sources for macOS 14 |
-| `scripts/build-openconnect-ios.sh` | Builds static libopenconnect + OpenSSL for iOS into `Engine/ios` |
-| `scripts/build-openconnect-android.sh` | Builds libopenconnect with its Java bindings for Android (arm64) |
-| `scripts/engine-sources.sh` | The pinned source versions and checksums all engine builds use |
-| `scripts/bundle-openconnect.sh` | Stages the engine and its dylibs in `Engine/openconnect` |
+| `scripts/pkg` | Installer scripts; `postinstall` removes the old tunnel helper |
 | `project.yml` | XcodeGen spec for `GateLink.xcodeproj` |
 
 ## Build
 
-Requirements: Xcode 16 or later, [XcodeGen](https://github.com/yonaskolb/XcodeGen)
-(`brew install xcodegen`), and an OpenConnect engine to bundle.
+Requirements: Xcode 16 or later and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+(`brew install xcodegen`).
 
 ```bash
-# Engine: either reuse a local Homebrew openconnect (fine for your own Mac)…
-brew install openconnect
-./scripts/bundle-openconnect.sh
-
-# …or build the distributable macOS 14 engine from source (what CI does).
-./scripts/build-openconnect-engine.sh
-PREFIX="${TMPDIR%/}/gatelink-engine"
-GATELINK_OPENCONNECT="$PREFIX/sbin/openconnect" GATELINK_EXTRA_PREFIX="$PREFIX" \
-  GATELINK_VPNC_SCRIPT="$PREFIX/etc/vpnc/vpnc-script" ./scripts/bundle-openconnect.sh
-
 ./scripts/build-macos-app.sh      # → dist/GateLink.app
-./scripts/build-macos-pkg.sh      # → dist/GateLink.pkg (app + tunnel helper in one install)
-```
-
-To work in Xcode, run `xcodegen generate` and open `GateLink.xcodeproj`.
-
-Run the tests:
-
-```bash
+./scripts/build-macos-pkg.sh      # → dist/GateLink.pkg
 swift test --package-path GateLinkKit
 ```
 
-The tests need no network or VPN: the login is exercised against a fake
-`openconnect` script, and the session state machine against fake tunnels.
-
-## iOS
-
-The iPhone app has the popover's screens: the account and code (tap to copy),
-Portal, Username, a password sheet with AutoFill, and Connect. iOS cannot run
-`openconnect` or `sudo`, so the parts are split differently:
-
-```
-Connect
-├─ Face ID unlocks the vault
-├─ the app logs in with libopenconnect: password + OTP → cookie + certificate pin
-│     (the certificate must be trusted by iOS for the portal name you typed)
-└─ startVPNTunnel → GateLinkTunnel (Packet Tunnel extension)
-      libopenconnect opens the SSL tunnel with the cookie, accepting only the pin;
-      iOS applies the gateway's address, split routes and DNS
-```
-
-The VPN keeps running after GateLink closes; reopening it picks the tunnel up.
-A failed tunnel logs in again with a fresh code while the app is open; turning
-the VPN off in Settings does not reconnect. The HIP report the macOS app sends
-(`hipreport.sh`) is not sent on iOS.
-
-Apple allows Network Extensions only for paid developer teams, so a free
-Personal Team cannot sign it. The targets use `com.example.gatelink` IDs. Put
-your team in `GateLinkiOS/Signing.local.xcconfig` (gitignored, so it stays out
-of the repo), sign in to that account in Xcode, then:
-
-```bash
-echo 'DEVELOPMENT_TEAM = ABCDE12345' > GateLinkiOS/Signing.local.xcconfig
-./scripts/build-openconnect-ios.sh   # → Engine/ios (static, iOS 18.4+)
-xcodegen generate
-xcodebuild -project GateLink.xcodeproj -scheme GateLinkiOS -derivedDataPath build/ios \
-  -destination 'id=<iPhone UDID>' -allowProvisioningUpdates build
-xcrun devicectl device install app --device <iPhone UDID> \
-  build/ios/Build/Products/Debug-iphoneos/GateLink.app
-```
-
-Or open `GateLink.xcodeproj` and run the `GateLinkiOS` scheme on the phone.
-Tunnel logs are in Console.app under the subsystem `com.example.gatelink`.
-
-## Android
-
-The Android app has the same screens and needs Android 11 or later on an
-arm64 phone. One `VpnService` session does what the Mac splits in two:
-
-```
-Connect
-├─ fingerprint or screen lock unlocks the vault key (60 s)
-├─ Android's "Connection request" dialog, once
-└─ GateLinkVpnService (libopenconnect through its Java bindings)
-      login: password + OTP → cookie; the certificate must be trusted by
-      Android for the portal name you typed
-      tunnel: the gateway's address, split routes and DNS via VpnService.Builder;
-      the connection to the gateway itself stays outside the tunnel
-```
-
-Secrets are AES-GCM encrypted with an Android Keystore key that works for 60 s
-after you unlock, so the phone needs a screen lock. Turning the VPN off in
-Settings, or a lost tunnel after OpenConnect's own 5-minute reconnect, ends the
-session; press Connect again. Unlike the Mac app, it sends no HIP report.
-
-Build (Android SDK with NDK 29 and JDK 17; Android Studio provides both):
-
-```bash
-./scripts/build-openconnect-android.sh   # → android/app/src/main/jniLibs, LibOpenConnect.java
-cd android && ./gradlew assembleDebug    # → app/build/outputs/apk/debug/app-debug.apk
-./gradlew testDebugUnitTest              # OTP, account lookup, routes, certificate names
-adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
-
-The debug APK is signed with Android's debug key, which is fine for your own
-phones. Releases attach `GateLink-android.apk`, signed with the GateLink key
-(see [docs/RELEASING.md](docs/RELEASING.md)); a phone with a debug build needs
-one uninstall before it can install a release APK.
+To work in Xcode, run `xcodegen generate` and open `GateLink.xcodeproj`. The tests
+need no VPN: the login flow runs against a fake GlobalProtect.
 
 ## Security model
 
 - **Secrets** (TOTP seed, VPN password) are stored per account in the login
   Keychain. The item's access list trusts only GateLink, and the app asks for
-  Touch ID (or the login password) before reading one. Account names and
-  settings are plain JSON in `~/Library/Application Support/GateLink`.
-- **The credential** is written to openconnect's terminal with echo disabled,
-  never passed on a command line, and redacted from any error text.
-- **Root access** goes through one fixed-purpose wrapper. sudoers authorizes
-  only `/usr/local/libexec/gatelink/gatelink-tunnel`; it accepts a validated
-  host and certificate pin, builds the openconnect command itself from
-  root-owned files, and only signals a PID that is its own openconnect.
-  The app checks the host and pin too before calling it.
-- **Approved portals**: the wrapper connects only to portals listed in the
-  root-owned `/usr/local/libexec/gatelink/allowed-gateways`. A new portal is
-  added with one administrator prompt on its first Connect, so another program
-  running as you cannot point the root tunnel at its own server.
-- **Logs**: tunnel output goes to `~/Library/Logs/GateLink/tunnel.log` (0600,
-  rotated at 512 KB). The session cookie travels on stdin and is never logged.
+  Touch ID (or the login password) before reading one. Account names and settings
+  are plain JSON in `~/Library/Application Support/GateLink`.
+- **Both login factors live on this Mac.** Keeping the 2FA secret beside the
+  password is the convenience this app exists for, and a security review may
+  count it as one factor. Check your organisation's policy before using it.
+- **Accessibility permission** lets GateLink control other apps. It only presses
+  GlobalProtect's controls and only reads its labels, never a field's contents.
+- **The password** goes only to a process with GlobalProtect's bundle ID and Palo
+  Alto Networks' signature, checked again right before filling. GateLink clears
+  the field if the login fails.
 
-Remove the helper from the Requirements window, or with
-`./scripts/install-tunnel-helper.sh --uninstall`.
+## Upgrading
 
-## Upgrading from the .NET version (v0.1.x)
-
-The Swift app does not read the old vault. After upgrading, add your 2FA
-account again (QR image or secret key) and enter the VPN password once. The old
-`~/gatelink-auth.log` may contain a session cookie; delete it. v0.1.x does
-not update itself to v2: install the `.pkg` from the release.
+- **From 2.x:** installing the `.pkg` stops any GateLink tunnel and removes the
+  root helper (`/usr/local/libexec/gatelink`) and its sudo rule
+  (`/etc/sudoers.d/gatelink`). Deleting the app alone leaves them behind. Your
+  accounts and passwords carry over.
+- **From the .NET version (v0.1.x):** the app does not read the old vault, so add
+  your 2FA account again and enter the VPN password once. The old
+  `~/gatelink-auth.log` may contain a session cookie; delete it. v0.1.x does not
+  update itself: install the `.pkg` from the release.
 
 ## Troubleshooting
 
-**"Root tunnel helper missing or not authorized"**: press Connect and approve
-the administrator prompt, or run `./scripts/install-tunnel-helper.sh --user "$USER"`.
+**"Allow GateLink in System Settings"**: turn it on under Privacy & Security >
+Accessibility. Builds are ad-hoc signed, so macOS may need this again after an
+update: remove GateLink from the list and add it again.
 
-**"Login failed"**: check the username, the password, and that the Mac's
-clock is right (codes are time-based).
+**"GlobalProtect didn't accept the login"**: check the password saved in GateLink,
+and that the Mac's clock is right (codes are time-based). GateLink won't retry.
 
-**Anything else**: open … → Requirements… in the popover, and check
-`~/Library/Logs/GateLink/tunnel.log`.
+**"GlobalProtect didn't show its login screen"**: check its window for a network
+or portal error, or log in there by hand.

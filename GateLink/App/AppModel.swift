@@ -1,20 +1,14 @@
-#if os(macOS)
 import AppKit
-#else
-import UIKit
-#endif
 import GateLinkKit
 import Observation
 
-/// App state for the macOS menu bar app and the iOS app. Platform-only parts
-/// live in AppModel+macOS.swift and AppModel+iOS.swift.
+/// App state for the menu bar app. Updater and system settings live in AppModel+macOS.swift.
 @MainActor
 @Observable
 final class AppModel {
     let vault: Vault
-    let session: VPNSession
+    let session: GlobalProtectSession
 
-    var gateway: String
     /// Typing another account's username switches to that account, so its OTP is used.
     var username = "" {
         didSet {
@@ -29,14 +23,7 @@ final class AppModel {
     private(set) var revealed: TOTP?
     private(set) var selectedAccountID: UUID?
 
-    #if os(macOS)
-    let resources: AppResources
     var openAtLogin = false
-    /// Tunnel over ESP (UDP) instead of TCP/TLS; applies on the next Connect.
-    var useESP = UserDefaults.standard.bool(forKey: AppModel.useESPKey) {
-        didSet { UserDefaults.standard.set(useESP, forKey: Self.useESPKey) }
-    }
-    var requirements: [Requirement] = []
     var availableUpdate: AppUpdate?
     var updateStep: UpdateStep?
 
@@ -46,34 +33,15 @@ final class AppModel {
         case installing
     }
 
-    @ObservationIgnored let helper: TunnelHelper
     @ObservationIgnored var updateTicker: Task<Void, Never>?
-    #else
-    @ObservationIgnored let tunnel: PacketTunnelController
-    #endif
+    @ObservationIgnored let notifier = DisconnectNotifier()
     @ObservationIgnored private var relockTicker: Task<Void, Never>?
 
-    private static let gatewayKey = "gateway"
     private static let selectedAccountKey = "selectedAccount"
-    #if os(macOS)
-    nonisolated private static let useESPKey = "useESP"
-    #endif
 
     init() {
         vault = Vault()
-        #if os(macOS)
-        resources = AppResources(bundle: .main)
-        helper = TunnelHelper(installerURL: resources.installerURL)
-        let engine = resources.openConnectURL ?? URL(fileURLWithPath: "/opt/homebrew/bin/openconnect")
-        session = VPNSession(
-            authenticator: OpenConnectAuthenticator(executableURL: engine),
-            tunnel: HelperTunnelController(useESP: { UserDefaults.standard.bool(forKey: AppModel.useESPKey) })
-        )
-        #else
-        tunnel = PacketTunnelController()
-        session = VPNSession(authenticator: LibOpenConnectAuthenticator(), tunnel: tunnel)
-        #endif
-        gateway = UserDefaults.standard.string(forKey: Self.gatewayKey) ?? ""
+        session = GlobalProtectSession(ui: AccessibleGlobalProtect())
         selectedAccountID = UserDefaults.standard.string(forKey: Self.selectedAccountKey).flatMap(UUID.init)
 
         do {
@@ -165,12 +133,8 @@ final class AppModel {
         do {
             guard let secret = try await vault.secret(for: account, reason: "Copy the \(account.issuer) code") else { return }
             let code = try secret.makeTOTP(for: account).code()
-            #if os(macOS)
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(code, forType: .string)
-            #else
-            UIPasteboard.general.string = code
-            #endif
             message = "Code copied."
         } catch {
             message = error.localizedDescription
@@ -179,36 +143,26 @@ final class AppModel {
 
     // MARK: - Connection
 
-    /// Connect when idle, cancel while working, disconnect when connected.
+    /// Connect when idle, cancel while working. When connected, open
+    /// GlobalProtect, which owns the connection.
     func primaryAction() async {
         switch session.phase {
         case .connected:
-            await session.disconnect()
-        case .authenticating, .connecting, .reconnecting:
+            session.showGlobalProtect()
+        case .authenticating, .connecting:
             await session.cancel()
-        case .disconnecting:
-            break
         case .idle, .failed:
             await connect()
         }
     }
 
-    private func connect() async {
+    func connect() async {
         message = nil
         guard var account else {
             message = "Add a 2FA account first (+)."
             return
         }
-        let portal = gateway.trimmingCharacters(in: .whitespacesAndNewlines)
         let login = username.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !portal.isEmpty else {
-            message = "Enter the portal."
-            return
-        }
-        guard TunnelArgs.isValidHost(portal) else {
-            message = "The portal must be a hostname or IPv4 address (letters, digits, dots and hyphens)."
-            return
-        }
         guard !login.isEmpty else {
             message = "Enter your VPN username."
             return
@@ -217,20 +171,8 @@ final class AppModel {
             message = "Set your VPN password first."
             return
         }
-        gateway = portal
-        UserDefaults.standard.set(portal, forKey: Self.gatewayKey)
 
         do {
-            #if os(macOS)
-            if !TunnelHelper.isInstalled {
-                message = "GateLink needs a one-time administrator approval to install its tunnel helper."
-            } else if !TunnelHelper.isApproved(portal) {
-                message = "GateLink needs an administrator to approve \(portal) once."
-            }
-            try await helper.ensureReady(gateway: portal)
-            message = nil
-            #endif
-
             if account.username != login {
                 account.username = login
                 try vault.update(account)
@@ -240,15 +182,17 @@ final class AppModel {
             return
         }
 
-        await session.connect(gateway: portal, credentials: credentials(for: account.id, gateway: portal))
+        // Touch ID on every login, even right after showing the code.
+        vault.lock()
+        await session.connect(credentials: credentials(for: account.id))
     }
 
-    func credentials(for id: UUID, gateway: String) -> VPNSession.CredentialProvider {
+    private func credentials(for id: UUID) -> GlobalProtectSession.CredentialProvider {
         { [weak self] in
             guard let self, let account = vault.accounts.first(where: { $0.id == id }) else {
                 throw GateLinkError("The account was deleted.")
             }
-            guard let secret = try await vault.secret(for: account, reason: "Connect to \(gateway)") else {
+            guard let secret = try await vault.secret(for: account, reason: "Log in to GlobalProtect") else {
                 return nil
             }
             guard let password = secret.vpnPassword, !password.isEmpty else {

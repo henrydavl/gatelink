@@ -4,8 +4,7 @@
 #
 # Generates GateLink.xcodeproj from project.yml (XcodeGen), builds the Release
 # configuration for this Mac's architecture, and copies the result to
-# dist/GateLink.app. The OpenConnect engine staged in Engine/openconnect by
-# scripts/bundle-openconnect.sh is embedded in Contents/Helpers.
+# dist/GateLink.app.
 #
 # USAGE
 #   ./scripts/build-macos-app.sh
@@ -22,8 +21,6 @@ IDENTITY="${GATELINK_SIGN_IDENTITY:--}"
 ARCH="${GATELINK_ARCH:-$(uname -m)}"
 
 command -v xcodegen >/dev/null || { echo "ERROR: xcodegen not found (brew install xcodegen)." >&2; exit 1; }
-[ -x "$ROOT/Engine/openconnect/openconnect" ] || \
-  echo "warning: Engine/openconnect is empty; run scripts/bundle-openconnect.sh to embed the engine." >&2
 
 cd "$ROOT"
 xcodegen generate --quiet

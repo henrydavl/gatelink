@@ -3,7 +3,6 @@ import SwiftUI
 
 enum WindowID {
     static let addAccount = "add-account"
-    static let requirements = "requirements"
     static let password = "password"
 }
 
@@ -31,11 +30,6 @@ struct GateLinkApp: App {
             PasswordView(model: model)
         }
         .windowResizability(.contentSize)
-
-        Window("Requirements", id: WindowID.requirements) {
-            RequirementsView(model: model)
-        }
-        .windowResizability(.contentSize)
     }
 }
 
@@ -43,7 +37,7 @@ extension VPNPhase {
     var menuBarSymbol: String {
         switch self {
         case .connected: "checkmark.shield.fill"
-        case .authenticating, .connecting, .reconnecting, .disconnecting: "shield.lefthalf.filled"
+        case .authenticating, .connecting: "shield.lefthalf.filled"
         case .failed: "exclamationmark.shield"
         case .idle: "shield"
         }
