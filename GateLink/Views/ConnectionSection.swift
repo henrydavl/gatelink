@@ -1,7 +1,7 @@
 import GateLinkKit
 import SwiftUI
 
-/// Status line, credential form and the Connect / Cancel / Disconnect button.
+/// Status line, credential form and the Connect / Cancel / Open GlobalProtect button.
 struct ConnectionSection: View {
     @Bindable var model: AppModel
     @Environment(\.openWindow) private var openWindow
@@ -21,7 +21,6 @@ struct ConnectionSection: View {
 
             primaryButton
                 .controlSize(.large)
-                .disabled(phase == .disconnecting)
 
             if let feedback = model.feedback {
                 if model.feedbackIsError {
@@ -38,9 +37,6 @@ struct ConnectionSection: View {
         .padding(16)
     }
 
-    /// Disconnect is a gray button with a red label; a solid red one is too loud.
-    /// It is not the Return-key default: macOS draws the default button blue,
-    /// and Return should never drop the VPN.
     @ViewBuilder
     private var primaryButton: some View {
         let button = Button {
@@ -50,7 +46,7 @@ struct ConnectionSection: View {
                 .frame(maxWidth: .infinity)
         }
         if phase.isConnected {
-            button.buttonStyle(.bordered).foregroundStyle(.red)
+            button.buttonStyle(.bordered)
         } else {
             button.buttonStyle(.borderedProminent).tint(model.buttonTint).keyboardShortcut(.defaultAction)
         }
@@ -59,13 +55,7 @@ struct ConnectionSection: View {
     private var form: some View {
         Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 8, verticalSpacing: 8) {
             GridRow {
-                Text("Portal").gridColumnAlignment(.trailing)
-                TextField("Portal", text: $model.gateway, prompt: Text("vpn.example.com"))
-                    .labelsHidden()
-                    .textContentType(.URL)
-            }
-            GridRow {
-                Text("Username")
+                Text("Username").gridColumnAlignment(.trailing)
                 TextField("Username", text: $model.username, prompt: Text("VPN username"))
                     .labelsHidden()
             }

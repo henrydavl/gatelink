@@ -2,25 +2,13 @@
 #
 # postinstall — runs as root after Installer copies GateLink.app.
 #
-# Installs the root tunnel helper for the logged-in user, so the first Connect
-# needs no extra administrator prompt. A failure here does not fail the
-# install: the app offers to install the helper on the first Connect.
+# GateLink used to run its own VPN tunnel through a root helper. It now logs in
+# through the official GlobalProtect app, so stop any tunnel the old helper
+# still runs and remove the helper and its passwordless sudo rule.
 #
-APP="${2%/}/Applications/GateLink.app"
-USER_NAME="$(/usr/bin/stat -f '%Su' /dev/console 2>/dev/null)"
+HELPER_DIR="/usr/local/libexec/gatelink"
 
-if [[ -z "${USER_NAME}" || "${USER_NAME}" == "root" || "${USER_NAME}" == "loginwindow" ]]; then
-    echo "GateLink: no logged-in user; the app installs the tunnel helper on first Connect."
-    exit 0
-fi
-
-# Approve the portal the user last connected to, so an update needs no extra prompt.
-# The installer validates it and keeps portals approved earlier.
-args=(--user "${USER_NAME}")
-GATEWAY="$(/usr/bin/sudo -u "${USER_NAME}" /usr/bin/defaults read com.gatelink.app gateway 2>/dev/null || true)"
-[[ "${GATEWAY}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] && args+=(--gateway "${GATEWAY}")
-
-if ! "${APP}/Contents/Resources/install-tunnel-helper.sh" "${args[@]}"; then
-    echo "GateLink: tunnel helper install failed; the app retries on first Connect."
-fi
+[[ -x "${HELPER_DIR}/gatelink-tunnel" ]] && "${HELPER_DIR}/gatelink-tunnel" stop
+/bin/rm -f /etc/sudoers.d/gatelink
+/bin/rm -rf "${HELPER_DIR}"
 exit 0

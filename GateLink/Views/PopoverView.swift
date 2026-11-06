@@ -163,14 +163,8 @@ private struct AccountRow: View {
             .accessibilityLabel(model.revealed == nil ? "Show code" : "Hide code")
 
             Menu {
-                Button("Requirements…") { openWindow(WindowID.requirements) }
                 Button("Check for Updates") { Task { await model.checkForUpdate() } }
                     .disabled(model.updateStep != nil)
-                Toggle("Use ESP (UDP) Tunnel", isOn: Binding(
-                    get: { model.useESP },
-                    set: { model.useESP = $0 }
-                ))
-                .disabled(!model.canSwitchAccount)
                 Divider()
                 Button("Delete Account…", role: .destructive) { confirmDelete = true }
             } label: {
@@ -269,10 +263,7 @@ private struct UpdateBadge: View {
     }
 
     private func installHelp(_ update: AppUpdate) -> String {
-        var text = "Download, verify and install GateLink \(update.version), then reopen."
-        if model.session.phase.isConnected || model.session.phase.isBusy {
-            text += " Installing disconnects the VPN."
-        }
+        let text = "Download, verify and install GateLink \(update.version), then reopen."
         let notes = update.notes.trimmingCharacters(in: .whitespacesAndNewlines)
         return notes.isEmpty ? text : text + "\n\n" + notes
     }

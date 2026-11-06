@@ -1,17 +1,21 @@
 import AppKit
 import GateLinkKit
 import ServiceManagement
+import UserNotifications
 
-/// The menu bar app's helper, updater and system settings.
+/// The menu bar app's updater and system settings.
 extension AppModel {
     func startPlatform() {
-        if resources.openConnectURL == nil {
-            message = "The OpenConnect engine is missing. Open Requirements from the … menu."
-        }
         removeLegacyLaunchAgent()
         refreshOpenAtLogin()
         startUpdateTicker()
-        Task { await session.stopLeftoverTunnel() }
+        notifier.onTap = { [weak self] in
+            Task { await self?.connect() }
+        }
+        UNUserNotificationCenter.current().delegate = notifier
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        session.onDisconnect = { [weak self] in self?.notifier.announceDisconnect() }
+        session.startMonitoring()
     }
 
     // MARK: - Update
@@ -43,12 +47,7 @@ extension AppModel {
             updateStep = .verifying
             try await updater.verifyPackage(package, version: update.version)
 
-            // Installer replaces the tunnel helper's engine, so the tunnel must not be using it.
-            if session.phase.isConnected {
-                await session.disconnect()
-            } else if session.phase.isBusy {
-                await session.cancel()
-            }
+            await session.cancel()
             updateStep = .installing
             try await updater.install(package, version: update.version)
             try Updater.relaunchAfterExit()
@@ -75,20 +74,6 @@ extension AppModel {
 
     // MARK: - System
 
-    func refreshRequirements() async {
-        requirements = await Requirements.check(resources)
-    }
-
-    func uninstallHelper() async {
-        do {
-            try await helper.uninstall()
-            message = "The tunnel helper was removed."
-        } catch {
-            message = error.localizedDescription
-        }
-        await refreshRequirements()
-    }
-
     func setOpenAtLogin(_ enabled: Bool) {
         do {
             if enabled {
@@ -114,7 +99,36 @@ extension AppModel {
     }
 
     func quit() {
-        // The tunnel helper sees its stdin close and stops the VPN.
         NSApp.terminate(nil)
+    }
+}
+
+/// Says when GlobalProtect's session ends; clicking starts a new login, which asks for Touch ID.
+final class DisconnectNotifier: NSObject, UNUserNotificationCenterDelegate, @unchecked Sendable {
+    @MainActor var onTap: (@MainActor @Sendable () -> Void)?
+
+    func announceDisconnect() {
+        let content = UNMutableNotificationContent()
+        content.title = "GlobalProtect disconnected"
+        content.body = "Click to log in again with Touch ID."
+        content.sound = .default
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "disconnected", content: content, trigger: nil)
+        )
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        await onTap?()
+    }
+
+    /// A menu bar app can count as frontmost; still show the banner.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 }

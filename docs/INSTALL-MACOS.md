@@ -14,8 +14,10 @@ macOS 14 or later.
 
 Double-click the `.pkg`. It is not notarized, so macOS blocks it the first
 time: open **System Settings → Privacy & Security**, press **Open Anyway**,
-then run the installer. Installer asks for your administrator password once
-and sets up both the app and GateLink's tunnel helper.
+then run the installer. Installer asks for your administrator password once.
+
+You also need the official GlobalProtect app, installed and set up with your
+portal.
 
 GateLink lives in the menu bar (a shield icon); it has no Dock icon.
 
@@ -33,23 +35,20 @@ login password) to save the secret in the Keychain.
 
 ## 3. Connect
 
-1. Enter the **Portal** (for example `vpn.example.com`) and check your
-   **Username**. Next to **Password**, press **Set…** and enter your VPN
-   password (or pick it with the Passwords app). It is saved in the Keychain,
-   so you do this once.
+1. Check your **Username**. Next to **Password**, press **Set…** and enter your
+   VPN password (or pick it with the Passwords app). It is saved in the Keychain,
+   so you do this once, and again when your password changes.
 2. Press **Connect**.
-3. The first Connect to a portal asks for an administrator password once, to
-   approve that portal: the tunnel helper connects only to approved portals.
-   Updates keep the approval. Connect also asks if the helper is missing (for
-   example after you removed it from Requirements) and reinstalls it to
-   `/usr/local/libexec/gatelink`, with a sudoers rule that allows only that
-   helper.
-4. Approve Touch ID. GateLink logs in with your password plus the current code
-   and starts the tunnel.
+3. The first time, macOS asks for Accessibility permission. Turn on GateLink under
+   **System Settings → Privacy & Security → Accessibility**, then press **Connect**
+   again. GateLink needs it to fill in GlobalProtect's login window.
+4. Approve Touch ID. GateLink opens GlobalProtect, fills in your username and your
+   password plus the current code, and presses Connect once.
 
-While it works, the button reads **Cancel**. Once connected it reads
-**Disconnect**, and the status line shows the portal and the time you
-connected. If the connection drops, GateLink reconnects with a fresh code.
+While it works, the button reads **Cancel**. Once connected it reads **Open
+GlobalProtect**: disconnect there. When the session ends you get a notification;
+click it to log in again. If a login is rejected GateLink doesn't retry, so check
+your saved password before pressing Connect again.
 
 ## 4. Everyday use
 
@@ -65,16 +64,12 @@ connected. If the connection drops, GateLink reconnects with a fresh code.
   newer release exists, **Update to vX.Y.Z** appears next to the version.
   Click it: GateLink downloads the `.pkg` for your Mac, checks its SHA-256
   against the release and that it contains GateLink at that version, asks for
-  your administrator password, installs it and reopens. Installing disconnects
-  the VPN. Hover the button for the release notes, right-click it to open them
+  your administrator password, installs it and reopens. Hover the button for the release notes, right-click it to open them
   on GitHub, or use … → **Check for Updates**.
-- **Quit** disconnects the VPN. So does a crash or Force Quit: the tunnel
-  never outlives the app.
+- **Quit** closes GateLink only. GlobalProtect stays connected.
 
 ## 5. If something fails
 
-Open **… → Requirements…**. It checks the bundled OpenConnect engine, the
-tunnel helper and its sudoers rule, and the HIP report script, and says how to
-fix each one. **Remove Tunnel Helper…** uninstalls the helper.
-
-The tunnel log is at `~/Library/Logs/GateLink/tunnel.log`.
+GateLink says which step failed. You can always log in to GlobalProtect by hand. If
+**Connect** asks for Accessibility permission when it's already on, remove GateLink
+from the list and add it again; this can happen after an update.

@@ -3,8 +3,7 @@
 # build-macos-pkg.sh — package GateLink.app into an installer package.
 #
 # Produces dist/GateLink.pkg. Installer copies the app to /Applications and
-# then installs the root tunnel helper for the logged-in user, so everything
-# is set up with the one administrator prompt Installer already asks for.
+# removes the VPN tunnel helper that versions before 3.0 installed.
 #
 # USAGE
 #   ./scripts/build-macos-pkg.sh          # builds the .app first if needed
@@ -49,4 +48,4 @@ rm -rf "$STAGE" "$PLIST"
 
 echo
 echo "Built: $PKG (v$VERSION)"
-echo "Install: double-click it; Installer sets up the app and the tunnel helper."
+echo "Install: double-click it."
