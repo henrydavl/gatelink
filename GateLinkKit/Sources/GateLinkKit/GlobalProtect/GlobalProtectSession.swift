@@ -149,11 +149,21 @@ public final class GlobalProtectSession {
         await work?.value
     }
 
-    public func showGlobalProtect() {
+    /// Opens GlobalProtect's window. If it shows GlobalProtect is disconnected,
+    /// a connection the log never reported as ended goes back to idle.
+    public func showGlobalProtect() async {
         do {
-            if ui.screen() == .closed { try ui.toggleWindow() }
+            if ui.screen() == .closed {
+                try ui.toggleWindow()
+                // shortcut: fixed wait for the window to draw; if GlobalProtect is slower, the next click catches it.
+                try? await sleep(1)
+            }
         } catch {
             phase = .failed(error.localizedDescription)
+            return
+        }
+        if phase.isConnected, [.portal, .login].contains(ui.screen()) {
+            phase = .idle
         }
     }
 

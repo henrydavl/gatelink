@@ -209,6 +209,19 @@ final class FakeGlobalProtect: GlobalProtectUI {
         #expect(drops == 1)
     }
 
+    @Test func aStaleConnectionEndsWhenGlobalProtectIsOpened() async {
+        let session = makeSession()
+        ui.logSays = true
+        session.refresh()
+        #expect(session.phase.isConnected)
+
+        ui.current = .closed
+        let task = Task { await session.showGlobalProtect() }
+        #expect(await drive(clock) { session.phase == .idle })
+        await task.value
+        #expect(ui.toggles == 1)
+    }
+
     @Test func recognisesTheRealScreens() {
         typealias E = GlobalProtectScreen.Element
         let portal = [E(role: "AXImage", title: "GlobalProtect Disconnected"), E(role: "AXStaticText", text: "Not Connected"),

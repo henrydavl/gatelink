@@ -148,7 +148,7 @@ final class AppModel {
     func primaryAction() async {
         switch session.phase {
         case .connected:
-            session.showGlobalProtect()
+            await session.showGlobalProtect()
         case .authenticating, .connecting:
             await session.cancel()
         case .idle, .failed:
